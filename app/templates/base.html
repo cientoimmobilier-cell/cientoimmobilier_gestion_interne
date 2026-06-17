@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Ciento Immobilier{% endblock %}</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Custom Premium CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+
+    <div class="wrapper">
+        <!-- Sidebar -->
+        <nav id="sidebar">
+            <div class="sidebar-header text-center py-3">
+                <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Ciento Logo" class="img-fluid mb-2 rounded-3 shadow-sm" style="max-height: 50px;">
+                <h5 class="text-white mb-0 fw-bold">Ciento</h5>
+                <small class="text-warning text-uppercase fw-semibold" style="font-size: 0.65rem; letter-spacing: 1px;">Immobilier</small>
+            </div>
+
+            <ul class="list-unstyled components">
+                <li class="{% if request.blueprint == 'dashboard' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard.index') }}">
+                        <i class="fa-solid fa-chart-line"></i> Tableau de bord
+                    </a>
+                </li>
+                <li class="{% if request.blueprint == 'clients' %}active{% endif %}">
+                    <a href="{{ url_for('clients.list_clients') }}">
+                        <i class="fa-solid fa-user-tie"></i> Gestion Clients
+                    </a>
+                </li>
+                <li class="{% if request.blueprint == 'owners' %}active{% endif %}">
+                    <a href="{{ url_for('owners.list_owners') }}">
+                        <i class="fa-solid fa-user-shield"></i> Propriétaires
+                    </a>
+                </li>
+                <li class="{% if request.blueprint == 'properties' %}active{% endif %}">
+                    <a href="{{ url_for('properties.list_properties') }}">
+                        <i class="fa-solid fa-house-chimney"></i> Biens Immobiliers
+                    </a>
+                </li>
+                <li class="{% if request.blueprint == 'transactions' %}active{% endif %}">
+                    <a href="{{ url_for('transactions.list_transactions') }}">
+                        <i class="fa-solid fa-file-invoice-dollar"></i> Transactions
+                    </a>
+                </li>
+                {% if current_user.is_authenticated and current_user.role in ['Administrateur', 'Directeur'] %}
+                <li class="{% if request.blueprint == 'settings' %}active{% endif %}">
+                    <a href="{{ url_for('settings.list_users') }}">
+                        <i class="fa-solid fa-users-gear"></i> Paramètres
+                    </a>
+                </li>
+                <li class="{% if request.endpoint == 'dashboard.activities' %}active{% endif %}">
+                    <a href="{{ url_for('dashboard.activities') }}">
+                        <i class="fa-solid fa-shield-halved"></i> Journal d'activité
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+
+            <div class="p-3 text-center" style="position: absolute; bottom: 0; width: 260px;">
+                <hr class="text-secondary">
+                <p class="mb-0 text-muted" style="font-size: 0.8rem;">Local Server Mode</p>
+            </div>
+        </nav>
+
+        <!-- Page Content -->
+        <div id="content">
+            <!-- Navbar -->
+            <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom rounded-3 px-4 py-2 mb-4 shadow-sm">
+                <div class="container-fluid px-0">
+                    <button type="button" id="sidebarCollapse" class="btn btn-outline-secondary border-0 rounded-circle me-3">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    
+                    <span class="navbar-brand fw-bold text-dark mb-0">{% block header_title %}Tableau de bord{% endblock %}</span>
+                    
+                    <div class="ms-auto d-flex align-items-center">
+                        {% if current_user.is_authenticated %}
+                            <div class="dropdown me-3">
+                                <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <div class="bg-warning text-dark rounded-circle d-flex align-items-center justify-content-center fw-bold me-2" style="width: 36px; height: 36px;">
+                                        {{ current_user.prenom[0]|upper }}{{ current_user.nom[0]|upper }}
+                                    </div>
+                                    <div class="d-none d-md-block text-start">
+                                        <div class="fw-semibold text-dark" style="font-size: 0.9rem; line-height: 1.1;">{{ current_user.prenom }} {{ current_user.nom }}</div>
+                                        <span class="badge bg-secondary" style="font-size: 0.65rem;">{{ current_user.role }}</span>
+                                    </div>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="userDropdown">
+                                    <li><span class="dropdown-item-text text-muted" style="font-size: 0.85rem;">{{ current_user.email }}</span></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="fa-solid fa-sign-out-alt me-2"></i>Déconnexion</a></li>
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Notifications Flask Flash Messages -->
+            <div class="container-fluid px-0">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show rounded-3 shadow-sm border-0 mb-4" role="alert">
+                                <i class="fa-solid {% if category == 'success' %}fa-circle-check{% elif category == 'danger' %}fa-circle-exclamation{% else %}fa-circle-info{% endif %} me-2"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <!-- Main Block -->
+            <div class="container-fluid px-0">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

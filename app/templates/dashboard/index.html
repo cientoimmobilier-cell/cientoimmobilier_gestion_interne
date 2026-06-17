@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de Bord - Ciento Immobilier{% endblock %}
+{% block header_title %}Tableau de bord de l'agence{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Stat 1 -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card-premium card-stat">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Biens Disponibles</div>
+                    <div class="stat-value">{{ available_properties }} / {{ total_properties }}</div>
+                </div>
+                <div class="text-warning fs-1"><i class="fa-solid fa-house-circle-check"></i></div>
+            </div>
+        </div>
+    </div>
+    <!-- Stat 2 -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card-premium card-stat" style="border-left-color: #10b981;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Clients Portefeuille</div>
+                    <div class="stat-value">{{ total_clients }}</div>
+                </div>
+                <div class="text-success fs-1"><i class="fa-solid fa-users"></i></div>
+            </div>
+        </div>
+    </div>
+    <!-- Stat 3 -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card-premium card-stat" style="border-left-color: #3b82f6;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Ventes du Mois</div>
+                    <div class="stat-value">{{ sales_this_month }}</div>
+                </div>
+                <div class="text-primary fs-1"><i class="fa-solid fa-handshake"></i></div>
+            </div>
+        </div>
+    </div>
+    <!-- Stat 4 -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card-premium card-stat" style="border-left-color: #8b5cf6;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Locations Actives</div>
+                    <div class="stat-value">{{ active_rentals }}</div>
+                </div>
+                <div class="text-purple fs-1" style="color: #8b5cf6;"><i class="fa-solid fa-file-contract"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-2">
+    <!-- Chart.js Graph -->
+    <div class="col-lg-5 col-md-12">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4">Répartition des Biens Immobiliers</h5>
+            <div style="height: 280px; position: relative;">
+                <canvas id="propertyTypeChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Recent Visits -->
+    <div class="col-lg-7 col-md-12">
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">Visites Récentes ou Planifiées</h5>
+                <a href="{{ url_for('properties.list_properties') }}" class="btn btn-sm btn-outline-secondary rounded-3">Voir les Biens</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Bien</th>
+                            <th>Client</th>
+                            <th>Agent</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for visit in recent_visits %}
+                        <tr>
+                            <td>{{ visit.date_visite.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td><span class="text-dark fw-semibold">{{ visit.propriete.reference_bien }}</span></td>
+                            <td>{{ visit.client.prenom }} {{ visit.client.nom }}</td>
+                            <td>{{ visit.agent.prenom }} {{ visit.agent.nom }}</td>
+                            <td>
+                                <span class="badge bg-opacity-10 
+                                    {% if visit.statut == 'Planifiée' %}bg-warning text-warning
+                                    {% elif visit.statut == 'Effectuée' %}bg-success text-success
+                                    {% else %}bg-danger text-danger{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    {{ visit.statut }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Aucune visite enregistrée pour le moment.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-2">
+    <!-- Recent Transactions -->
+    <div class="col-12">
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">Dernières Transactions Saisies</h5>
+                <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-accent btn-sm rounded-3">Gérer les Transactions</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Réf Transaction</th>
+                            <th>Type</th>
+                            <th>Bien</th>
+                            <th>Client</th>
+                            <th>Agent</th>
+                            <th>Montant</th>
+                            <th>Date</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in recent_transactions %}
+                        <tr>
+                            <td><span class="fw-semibold text-dark">{{ tx.reference_transaction }}</span></td>
+                            <td>
+                                <span class="badge {% if tx.type_transaction == 'Vente' %}bg-primary{% else %}bg-info{% endif %} rounded-pill px-2 py-1">
+                                    {{ tx.type_transaction }}
+                                </span>
+                            </td>
+                            <td>{{ tx.propriete.reference_bien }}</td>
+                            <td>{{ tx.client.prenom }} {{ tx.client.nom }}</td>
+                            <td>{{ tx.agent.prenom }} {{ tx.agent.nom }}</td>
+                            <td class="fw-bold">{{ tx.montant | format_price(tx.propriete.devise) }}</td>
+                            <td>{{ tx.date_transaction.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <span class="badge bg-opacity-10 
+                                    {% if tx.statut == 'Finalisée' %}bg-success text-success
+                                    {% elif tx.statut == 'En cours' %}bg-warning text-warning
+                                    {% else %}bg-danger text-danger{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    {{ tx.statut }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">Aucune transaction enregistrée.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js de CDN pour générer des graphiques premium -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('propertyTypeChart').getContext('2d');
+        
+        const labels = {{ type_labels|tojson }};
+        const counts = {{ type_counts|tojson }};
+        
+        // Palette harmonieuse et élégante
+        const colors = [
+            '#0f172a', // Navy
+            '#d97706', // Gold/Amber
+            '#3b82f6', // Royal Blue
+            '#10b981', // Emerald
+            '#8b5cf6', // Violet
+            '#ec4899', // Pink
+            '#64748b'  // Slate
+        ];
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels.length > 0 ? labels : ['Aucun bien enregistré'],
+                datasets: [{
+                    data: counts.length > 0 ? counts : [1],
+                    backgroundColor: labels.length > 0 ? colors.slice(0, labels.length) : ['#e2e8f0'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: {
+                                family: 'Outfit',
+                                size: 12
+                            },
+                            usePointStyle: true,
+                            padding: 15
+                        }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+    });
+</script>
+{% endblock %}

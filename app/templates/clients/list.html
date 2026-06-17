@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Clients - Ciento Immobilier{% endblock %}
+{% block header_title %}Portefeuille Clients{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card-premium">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-users text-warning me-2"></i>Liste des clients enregistrés</h5>
+                
+                <div class="d-flex flex-wrap gap-2">
+                    <!-- Barre de recherche -->
+                    <form method="GET" action="{{ url_for('clients.list_clients') }}" class="d-flex align-items-center">
+                        <div class="input-group">
+                            <input type="text" name="search" class="form-control form-control-premium" placeholder="Nom, e-mail, téléphone..." value="{{ search }}">
+                            <button class="btn btn-premium border-start-0 rounded-end-3" type="submit"><i class="fa-solid fa-search"></i></button>
+                        </div>
+                        {% if search %}
+                        <a href="{{ url_for('clients.list_clients') }}" class="btn btn-outline-secondary ms-2 border-0 rounded-circle"><i class="fa-solid fa-times"></i></a>
+                        {% endif %}
+                    </form>
+                    
+                    <a href="{{ url_for('clients.export_clients') }}" class="btn btn-outline-success rounded-3"><i class="fa-solid fa-file-excel me-2"></i>Exporter</a>
+                    {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-toggle="modal" data-bs-target="#importClientsModal"><i class="fa-solid fa-file-import me-2"></i>Importer</button>
+                    {% endif %}
+                    <a href="{{ url_for('clients.add_client') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un client</a>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Code Client</th>
+                            <th>Nom complet</th>
+                            <th>Téléphone</th>
+                            <th>Adresse e-mail</th>
+                            <th>Ville</th>
+                            <th>Profession</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for client in clients %}
+                        <tr>
+                            <td><span class="badge bg-light text-dark font-monospace">#{{ client.code_client }}</span></td>
+                            <td>
+                                <span class="fw-semibold text-dark">{{ client.prenom }} {{ client.nom }}</span>
+                            </td>
+                            <td>{{ client.telephone or 'N/A' }}</td>
+                            <td>{{ client.email or 'N/A' }}</td>
+                            <td>{{ client.ville or 'N/A' }}</td>
+                            <td>{{ client.profession or 'N/A' }}</td>
+                            <td class="text-end">
+                                <a href="{{ url_for('clients.view_client', client_id=client.id) }}" class="btn btn-sm btn-outline-primary rounded-3 me-1" title="Voir les détails"><i class="fa-solid fa-eye"></i></a>
+                                <a href="{{ url_for('clients.edit_client', client_id=client.id) }}" class="btn btn-sm btn-outline-secondary rounded-3 me-1" title="Modifier"><i class="fa-solid fa-pen"></i></a>
+                                {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                                <form action="{{ url_for('clients.delete_client', client_id=client.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce client ? Toutes ses demandes et visites associées seront également supprimées.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">Aucun client trouvé dans le portefeuille.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Import Excel Clients -->
+<div class="modal fade" id="importClientsModal" tabindex="-1" aria-labelledby="importClientsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-3 shadow border-0">
+            <div class="modal-header border-bottom-0 bg-light rounded-top-3">
+                <h5 class="modal-title fw-bold" id="importClientsModalLabel"><i class="fa-solid fa-file-import text-warning me-2"></i>Importer des clients (Excel)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('clients.import_clients') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body p-4">
+                    <p class="small text-muted mb-3">Sélectionnez un fichier Excel (<code>.xlsx</code>). La première ligne doit contenir les en-têtes de colonnes dans l'ordre suivant : <br><strong>Code Client, Nom, Prénom, Téléphone, Téléphone 2, E-mail, Adresse, Ville, Profession, Budget Min, Budget Max, Source, Observations</strong>.</p>
+                    <div class="mb-3">
+                        <label for="excel_file" class="form-label fw-semibold">Fichier Excel</label>
+                        <input class="form-control form-control-premium" type="file" id="excel_file" name="excel_file" accept=".xlsx" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 p-3 bg-light rounded-bottom-3 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Fermer</button>
+                    <button type="submit" class="btn btn-accent rounded-3">Importer les données</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Enregistrer une Transaction - Ciento Immobilier{% endblock %}
+{% block header_title %}Saisie de Transaction Commerciale{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-md-12">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-file-signature text-warning me-2"></i>Détails de l'accord commercial</h5>
+            
+            <form method="POST">
+                <div class="row">
+                    <!-- Client Acquéreur -->
+                    <div class="col-md-6 mb-3">
+                        <label for="client_id" class="form-label fw-semibold" style="font-size: 0.9rem;">Client (Acquéreur / Locataire)</label>
+                        <select class="form-select form-control-premium" id="client_id" name="client_id" required>
+                            <option value="">-- Sélectionner un client --</option>
+                            {% for c in clients %}
+                            <option value="{{ c.id }}">{{ c.prenom }} {{ c.nom }} (Code: {{ c.code_client }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <!-- Bien immobilier -->
+                    <div class="col-md-6 mb-3">
+                        <label for="propriete_id" class="form-label fw-semibold" style="font-size: 0.9rem;">Bien immobilier (Disponibles uniquement)</label>
+                        <select class="form-select form-control-premium" id="propriete_id" name="propriete_id" required>
+                            <option value="">-- Sélectionner un bien disponible --</option>
+                            {% for p in proprietes %}
+                            <option value="{{ p.id }}">{{ p.reference_bien }} - {{ p.titre }} ({{ p.prix }} €)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Agent -->
+                    <div class="col-md-6 mb-3">
+                        <label for="agent_id" class="form-label fw-semibold" style="font-size: 0.9rem;">Agent immobilier négociateur</label>
+                        <select class="form-select form-control-premium" id="agent_id" name="agent_id" required>
+                            <option value="">-- Sélectionner un collaborateur --</option>
+                            {% for a in agents %}
+                            <option value="{{ a.id }}" {% if a.id == current_user.id %}selected{% endif %}>{{ a.prenom }} {{ a.nom }} (Rôle: {{ a.role }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <!-- Type de transaction -->
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <label for="type_transaction" class="form-label fw-semibold" style="font-size: 0.9rem;">Type de transaction</label>
+                        <select class="form-select form-control-premium" id="type_transaction" name="type_transaction" required>
+                            <option value="Vente">Vente</option>
+                            <option value="Location">Location</option>
+                        </select>
+                    </div>
+                    <!-- Date de transaction -->
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <label for="date_transaction" class="form-label fw-semibold" style="font-size: 0.9rem;">Date de l'accord</label>
+                        <input type="date" class="form-control form-control-premium" id="date_transaction" name="date_transaction" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="montant" class="form-label fw-semibold" style="font-size: 0.9rem;">Montant total de l'opération</label>
+                        <input type="number" step="0.01" class="form-control form-control-premium" id="montant" name="montant" placeholder="250000" required>
+                        <div class="form-text">Prix de vente ou loyer annuel/mensuel selon le contrat.</div>
+                    </div>
+                    <!-- Devise -->
+                    <div class="col-md-2 mb-3">
+                        <label for="devise" class="form-label fw-semibold" style="font-size: 0.9rem;">Devise</label>
+                        <select class="form-select form-control-premium" id="devise" name="devise" required>
+                            <option value="EUR">EUR (€)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="HTG">HTG (Gourdes)</option>
+                        </select>
+                    </div>
+                    <!-- Pourcentage de commission de l'agent -->
+                    <div class="col-md-6 mb-3">
+                        <label for="pourcentage_commission" class="form-label fw-semibold" style="font-size: 0.9rem;">Taux de commission Agent (%)</label>
+                        <input type="number" step="0.01" class="form-control form-control-premium" id="pourcentage_commission" name="pourcentage_commission" placeholder="5" value="5">
+                        <div class="form-text">La commission sera automatiquement calculée sur le montant de l'opération.</div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="observations" class="form-label fw-semibold" style="font-size: 0.9rem;">Observations complémentaires / Conditions suspensives</label>
+                    <textarea class="form-control form-control-premium" id="observations" name="observations" rows="4" placeholder="Financement avec prêt bancaire, clause de diagnostic, accord de loyer..."></textarea>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-4">
+                    <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline-secondary rounded-3">Annuler</a>
+                    <button type="submit" class="btn btn-accent rounded-3 px-4">Créer l'accord de transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}{% if action == 'add' %}Ajouter{% else %}Modifier{% endif %} un collaborateur - Ciento Immobilier{% endblock %}
+{% block header_title %}{% if action == 'add' %}Nouveau collaborateur{% else %}Modifier {{ user.prenom }} {{ user.nom }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-user-plus text-warning me-2"></i>Informations du compte</h5>
+            
+            <form method="POST">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="prenom" class="form-label fw-semibold">Prénom</label>
+                        <input type="text" class="form-control form-control-premium" id="prenom" name="prenom" value="{{ user.prenom if action == 'edit' else '' }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="nom" class="form-label fw-semibold">Nom</label>
+                        <input type="text" class="form-control form-control-premium" id="nom" name="nom" value="{{ user.nom if action == 'edit' else '' }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="email" class="form-label fw-semibold">Adresse Email</label>
+                        <input type="email" class="form-control form-control-premium" id="email" name="email" value="{{ user.email if action == 'edit' else '' }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="telephone" class="form-label fw-semibold">Téléphone</label>
+                        <input type="text" class="form-control form-control-premium" id="telephone" name="telephone" value="{{ user.telephone if action == 'edit' else '' }}">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="role" class="form-label fw-semibold">Rôle attribué</label>
+                        <select class="form-select form-control-premium" id="role" name="role" required>
+                            <option value="Agent immobilier" {% if action == 'edit' and user.role == 'Agent immobilier' %}selected{% endif %}>Agent immobilier</option>
+                            <option value="Secrétaire" {% if action == 'edit' and user.role == 'Secrétaire' %}selected{% endif %}>Secrétaire</option>
+                            <option value="Comptable" {% if action == 'edit' and user.role == 'Comptable' %}selected{% endif %}>Comptable</option>
+                            <option value="Administrateur" {% if action == 'edit' and user.role == 'Administrateur' %}selected{% endif %}>Administrateur</option>
+                            <option value="Directeur" {% if action == 'edit' and user.role == 'Directeur' %}selected{% endif %}>Directeur</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3" id="zone_affectation_container">
+                        <label for="zone_affectation" class="form-label fw-semibold">Zone d'affectation</label>
+                        <input type="text" class="form-control form-control-premium" id="zone_affectation" name="zone_affectation" value="{{ user.zone_affectation if action == 'edit' and user.zone_affectation else '' }}" placeholder="Ex: Paris Centre, Rive Gauche...">
+                        <div class="form-text">Applicable uniquement pour les agents immobiliers.</div>
+                    </div>
+                </div>
+
+                {% if action == 'edit' %}
+                <div class="mb-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="actif" name="actif" {% if user.actif %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="actif">Compte Actif</label>
+                    </div>
+                    <div class="form-text">Si décoché, cet utilisateur ne pourra plus se connecter.</div>
+                </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-4">
+                    <a href="{{ url_for('settings.list_users') }}" class="btn btn-outline-secondary rounded-3">Annuler</a>
+                    <button type="submit" class="btn btn-accent rounded-3 px-4">{% if action == 'add' %}Créer le collaborateur{% else %}Enregistrer les modifications{% endif %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const roleSelect = document.getElementById('role');
+        const zoneContainer = document.getElementById('zone_affectation_container');
+        
+        function toggleZone() {
+            if (roleSelect.value === 'Agent immobilier') {
+                zoneContainer.style.display = 'block';
+            } else {
+                zoneContainer.style.display = 'none';
+            }
+        }
+        
+        roleSelect.addEventListener('change', toggleZone);
+        toggleZone(); // Initial check
+    });
+</script>
+{% endblock %}

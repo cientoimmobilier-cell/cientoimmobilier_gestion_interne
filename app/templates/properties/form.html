@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Saisie Fiche Immobilière - Ciento Immobilier{% endblock %}
+{% block header_title %}{{ action_title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-md-12">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-hotel text-warning me-2"></i>Caractéristiques du bien immobilier</h5>
+            
+            <form method="POST">
+                <div class="row">
+                    <!-- Titre -->
+                    <div class="col-12 mb-3">
+                        <label for="titre" class="form-label fw-semibold" style="font-size: 0.9rem;">Titre de l'annonce</label>
+                        <input type="text" class="form-control form-control-premium" id="titre" name="titre" placeholder="Magnifique appartement T3 avec vue dégagée" value="{{ property.titre if property else '' }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Propriétaire -->
+                    <div class="col-md-6 mb-3">
+                        <label for="proprietaire_id" class="form-label fw-semibold" style="font-size: 0.9rem;">Propriétaire bailleur/vendeur</label>
+                        <select class="form-select form-control-premium" id="proprietaire_id" name="proprietaire_id">
+                            <option value="">-- Sélectionner un propriétaire --</option>
+                            {% for prop in proprietaires %}
+                            <option value="{{ prop.id }}" {% if property and property.proprietaire_id == prop.id %}selected{% endif %}>{{ prop.prenom }} {{ prop.nom }} ({{ prop.email or prop.telephone }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <!-- Type de bien -->
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <label for="type_bien" class="form-label fw-semibold" style="font-size: 0.9rem;">Type de bien</label>
+                        <select class="form-select form-control-premium" id="type_bien" name="type_bien" required>
+                            <option value="Maison" {% if property and property.type_bien == 'Maison' %}selected{% endif %}>Maison</option>
+                            <option value="Appartement" {% if property and property.type_bien == 'Appartement' %}selected{% endif %}>Appartement</option>
+                            <option value="Terrain" {% if property and property.type_bien == 'Terrain' %}selected{% endif %}>Terrain</option>
+                            <option value="Villa" {% if property and property.type_bien == 'Villa' %}selected{% endif %}>Villa</option>
+                            <option value="Bureau" {% if property and property.type_bien == 'Bureau' %}selected{% endif %}>Bureau</option>
+                            <option value="Local commercial" {% if property and property.type_bien == 'Local commercial' %}selected{% endif %}>Local commercial</option>
+                            <option value="Entrepôt" {% if property and property.type_bien == 'Entrepôt' %}selected{% endif %}>Entrepôt</option>
+                            <option value="Immeuble" {% if property and property.type_bien == 'Immeuble' %}selected{% endif %}>Immeuble</option>
+                        </select>
+                    </div>
+                    <!-- Type d'opération -->
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <label for="type_operation" class="form-label fw-semibold" style="font-size: 0.9rem;">Opération</label>
+                        <select class="form-select form-control-premium" id="type_operation" name="type_operation" required>
+                            <option value="Vente" {% if property and property.type_operation == 'Vente' %}selected{% endif %}>Vente</option>
+                            <option value="Location" {% if property and property.type_operation == 'Location' %}selected{% endif %}>Location</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Ville -->
+                    <div class="col-md-4 mb-3">
+                        <label for="ville" class="form-label fw-semibold" style="font-size: 0.9rem;">Ville</label>
+                        <input type="text" class="form-control form-control-premium" id="ville" name="ville" placeholder="Paris" value="{{ property.ville if property else '' }}" required>
+                    </div>
+                    <!-- Quartier -->
+                    <div class="col-md-4 mb-3">
+                        <label for="quartier" class="form-label fw-semibold" style="font-size: 0.9rem;">Quartier</label>
+                        <input type="text" class="form-control form-control-premium" id="quartier" name="quartier" placeholder="Montmartre" value="{{ property.quartier if property else '' }}">
+                    </div>
+                    <!-- Statut -->
+                    <div class="col-md-4 mb-3">
+                        <label for="statut" class="form-label fw-semibold" style="font-size: 0.9rem;">Statut de commercialisation</label>
+                        <select class="form-select form-control-premium" id="statut" name="statut" required>
+                            <option value="Disponible" {% if property and property.statut == 'Disponible' %}selected{% endif %}>Disponible</option>
+                            <option value="Réservé" {% if property and property.statut == 'Réservé' %}selected{% endif %}>Réservé</option>
+                            <option value="Vendu" {% if property and property.statut == 'Vendu' %}selected{% endif %}>Vendu</option>
+                            <option value="Loué" {% if property and property.statut == 'Loué' %}selected{% endif %}>Loué</option>
+                            <option value="Suspendu" {% if property and property.statut == 'Suspendu' %}selected{% endif %}>Suspendu</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Prix -->
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <label for="prix" class="form-label fw-semibold" style="font-size: 0.9rem;">Prix demandé</label>
+                        <input type="number" step="0.01" class="form-control form-control-premium" id="prix" name="prix" placeholder="320000" value="{{ property.prix if property else '' }}" required>
+                    </div>
+                    <!-- Devise -->
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <label for="devise" class="form-label fw-semibold" style="font-size: 0.9rem;">Devise</label>
+                        <select class="form-select form-control-premium" id="devise" name="devise" required>
+                            <option value="EUR" {% if property and property.devise == 'EUR' %}selected{% endif %}>EUR (€)</option>
+                            <option value="USD" {% if property and property.devise == 'USD' %}selected{% endif %}>USD ($)</option>
+                            <option value="HTG" {% if property and property.devise == 'HTG' %}selected{% endif %}>HTG (Gourde)</option>
+                        </select>
+                    </div>
+                    <!-- Superficie -->
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <label for="superficie" class="form-label fw-semibold" style="font-size: 0.9rem;">Superficie (m²)</label>
+                        <input type="number" step="0.01" class="form-control form-control-premium" id="superficie" name="superficie" placeholder="75" value="{{ property.superficie if property and property.superficie else '' }}">
+                    </div>
+                    <!-- Chambres -->
+                    <div class="col-md-3 col-sm-6 mb-3">
+                        <label for="nombre_chambres" class="form-label fw-semibold" style="font-size: 0.9rem;">Chambres</label>
+                        <input type="number" class="form-control form-control-premium" id="nombre_chambres" name="nombre_chambres" placeholder="2" value="{{ property.nombre_chambres if property and property.nombre_chambres else '' }}">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- SdB -->
+                    <div class="col-md-6 col-sm-6 mb-3">
+                        <label for="nombre_salles_bain" class="form-label fw-semibold" style="font-size: 0.9rem;">Salles de bain</label>
+                        <input type="number" class="form-control form-control-premium" id="nombre_salles_bain" name="nombre_salles_bain" placeholder="1" value="{{ property.nombre_salles_bain if property and property.nombre_salles_bain else '' }}">
+                    </div>
+                    <!-- Garages -->
+                    <div class="col-md-6 col-sm-6 mb-3">
+                        <label for="nombre_garages" class="form-label fw-semibold" style="font-size: 0.9rem;">Garages</label>
+                        <input type="number" class="form-control form-control-premium" id="nombre_garages" name="nombre_garages" placeholder="1" value="{{ property.nombre_garages if property and property.nombre_garages else '' }}">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="adresse" class="form-label fw-semibold" style="font-size: 0.9rem;">Adresse exacte du bien</label>
+                    <textarea class="form-control form-control-premium" id="adresse" name="adresse" rows="2" placeholder="45 Rue des Abbesses, 75018 Paris" required>{{ property.adresse if property else '' }}</textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label fw-semibold" style="font-size: 0.9rem;">Description complète</label>
+                    <textarea class="form-control form-control-premium" id="description" name="description" rows="5" placeholder="Description du bien, exposition, état général, transports à proximité...">{{ property.description if property else '' }}</textarea>
+                </div>
+
+                <!-- Caractéristiques et Équipements (M2M Checkboxes) -->
+                <div class="mb-4">
+                    <label class="form-label fw-semibold d-block mb-3" style="font-size: 0.9rem;">Équipements et caractéristiques du bien</label>
+                    <div class="row">
+                        {% for carac in caracteristiques %}
+                        <div class="col-lg-3 col-md-4 col-6 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="caracteristiques" value="{{ carac.id }}" id="carac_{{ carac.id }}"
+                                    {% if property and carac in property.caracteristiques %}checked{% endif %}>
+                                <label class="form-check-label text-dark" for="carac_{{ carac.id }}" style="font-size: 0.9rem;">
+                                    {{ carac.nom }}
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-4">
+                    <a href="{{ url_for('properties.list_properties') }}" class="btn btn-outline-secondary rounded-3">Annuler</a>
+                    <button type="submit" class="btn btn-accent rounded-3 px-4">Enregistrer le bien</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

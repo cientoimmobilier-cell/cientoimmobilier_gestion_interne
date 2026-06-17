@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Fiche Immobilier - {{ property.reference_bien }}{% endblock %}
+{% block header_title %}Fiche du bien {{ property.reference_bien }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Colonne Gauche : Détails du bien et Galerie Photos -->
+    <div class="col-lg-7 col-md-12">
+        <!-- Galerie Photo Premium -->
+        <div class="card-premium p-0 overflow-hidden mb-4">
+            <div style="height: 380px; position: relative; background: #000;">
+                {% if property.photos %}
+                <div id="propertyCarousel" class="carousel slide h-100" data-bs-ride="carousel">
+                    <div class="carousel-inner h-100">
+                        {% for photo in property.photos %}
+                        <div class="carousel-item h-100 {% if photo.photo_principale %}active{% endif %}">
+                            <img src="{{ url_for('static', filename=photo.chemin_fichier) }}" class="d-block w-100 h-100" style="object-fit: contain;" alt="Photo du bien">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#propertyCarousel" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Précédent</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#propertyCarousel" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Suivant</span>
+                    </button>
+                </div>
+                {% else %}
+                <div class="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-warning">
+                    <i class="fa-solid fa-hotel fs-1 mb-2"></i>
+                    <span class="fw-semibold text-uppercase" style="letter-spacing: 1px;">Aucune photo disponible pour ce catalogue</span>
+                </div>
+                {% endif %}
+                
+                <!-- Badges positionnés sur la photo -->
+                <span class="position-absolute top-0 start-0 m-3 badge badge-status badge-{{ property.statut|lower }}" style="z-index: 10;">
+                    {{ property.statut }}
+                </span>
+                <span class="position-absolute top-0 end-0 m-3 badge {% if property.type_operation == 'Vente' %}bg-primary{% else %}bg-info{% endif %} rounded-pill px-3 py-2 fw-semibold" style="z-index: 10;">
+                    À la {{ property.type_operation }}
+                </span>
+            </div>
+            
+            <div class="p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h3 class="fw-bold text-dark mb-0">{{ property.titre }}</h3>
+                    <span class="property-price fs-2">{{ property.prix | format_price(property.devise) }}</span>
+                </div>
+                
+                <p class="text-muted mb-4"><i class="fa-solid fa-location-dot text-warning me-2"></i>{{ property.adresse }}, {{ property.quartier or '' }} {{ property.ville }}</p>
+                
+                <hr class="my-4">
+                
+                <h5 class="fw-bold text-dark mb-3">Description</h5>
+                <p class="text-dark" style="line-height: 1.6; white-space: pre-line;">{{ property.description or 'Aucune description disponible.' }}</p>
+                
+                <hr class="my-4">
+                
+                <h5 class="fw-bold text-dark mb-3">Équipements et caractéristiques</h5>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for carac in property.caracteristiques %}
+                    <span class="badge bg-light text-dark border rounded-pill px-3 py-2"><i class="fa-solid fa-check text-success me-2"></i>{{ carac.nom }}</span>
+                    {% else %}
+                    <span class="text-muted small">Aucun équipement particulier spécifié.</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Section Gestion des photos (Uniquement visible si connecté) -->
+        <div class="card-premium mb-4">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-images text-warning me-2"></i>Gestionnaire d'images</h5>
+            
+            <!-- Formulaire d'upload d'images -->
+            <form action="{{ url_for('properties.upload_photos', property_id=property.id) }}" method="POST" enctype="multipart/form-data" class="mb-4">
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-semibold">Ajouter des photos du bien</label>
+                    <input class="form-control form-control-premium" type="file" name="photos" id="photo-input" multiple accept="image/*">
+                </div>
+                <div id="photo-preview" class="d-flex flex-wrap mb-3"></div>
+                <button type="submit" class="btn btn-premium btn-sm rounded-3"><i class="fa-solid fa-cloud-arrow-up me-2"></i>Téléverser</button>
+            </form>
+
+            {% if property.photos %}
+            <div class="row g-2">
+                {% for photo in property.photos %}
+                <div class="col-md-3 col-6">
+                    <div class="position-relative border rounded overflow-hidden" style="height: 100px;">
+                        <img src="{{ url_for('static', filename=photo.chemin_fichier) }}" class="w-100 h-100" style="object-fit: cover;">
+                        
+                        <div class="position-absolute bottom-0 start-0 w-100 bg-dark bg-opacity-70 d-flex justify-content-between p-1">
+                            <!-- Définir principale -->
+                            <form action="{{ url_for('properties.set_main_photo', photo_id=photo.id) }}" method="POST">
+                                <button type="submit" class="btn btn-sm text-warning p-0 border-0" title="Photo principale">
+                                    <i class="fa-star {% if photo.photo_principale %}fa-solid{% else %}fa-regular{% endif %}"></i>
+                                </button>
+                            </form>
+                            
+                            <!-- Supprimer -->
+                            <form action="{{ url_for('properties.delete_photo', photo_id=photo.id) }}" method="POST" onsubmit="return confirm('Supprimer cette photo ?');">
+                                <button type="submit" class="btn btn-sm text-danger p-0 border-0" title="Supprimer la photo">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Colonne Droite : Fiche Technique, Documents et Visites -->
+    <div class="col-lg-5 col-md-12">
+        <!-- Fiche technique -->
+        <div class="card-premium mb-4">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-file-circle-check text-warning me-2"></i>Fiche Technique</h5>
+            
+            <div class="row g-3">
+                <div class="col-6">
+                    <div class="border rounded p-3 text-center bg-light">
+                        <small class="text-muted d-block text-uppercase" style="font-size: 0.65rem;">Superficie</small>
+                        <span class="fs-5 fw-bold text-dark">{{ property.superficie or '--' }} m²</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="border rounded p-3 text-center bg-light">
+                        <small class="text-muted d-block text-uppercase" style="font-size: 0.65rem;">Chambres</small>
+                        <span class="fs-5 fw-bold text-dark">{{ property.nombre_chambres or '--' }}</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="border rounded p-3 text-center bg-light">
+                        <small class="text-muted d-block text-uppercase" style="font-size: 0.65rem;">Salles de bain</small>
+                        <span class="fs-5 fw-bold text-dark">{{ property.nombre_salles_bain or '--' }}</span>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="border rounded p-3 text-center bg-light">
+                        <small class="text-muted d-block text-uppercase" style="font-size: 0.65rem;">Garages</small>
+                        <span class="fs-5 fw-bold text-dark">{{ property.nombre_garages or '--' }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Informations Propriétaire -->
+        {% if property.proprietaire %}
+        <div class="card-premium mb-4 bg-light bg-opacity-50">
+            <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-user-shield text-warning me-2"></i>Propriétaire du bien</h6>
+            <div class="d-flex align-items-center">
+                <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold me-3" style="width: 44px; height: 44px;">
+                    {{ property.proprietaire.prenom[0]|upper }}{{ property.proprietaire.nom[0]|upper }}
+                </div>
+                <div>
+                    <div class="fw-semibold text-dark">{{ property.proprietaire.prenom }} {{ property.proprietaire.nom }}</div>
+                    <small class="text-muted d-block"><i class="fa-solid fa-phone me-1"></i>{{ property.proprietaire.telephone or 'N/A' }}</small>
+                    <small class="text-muted d-block"><i class="fa-solid fa-envelope me-1"></i>{{ property.proprietaire.email or 'N/A' }}</small>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Gestion Documentaire -->
+        <div class="card-premium mb-4">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-folder-open text-warning me-2"></i>Documents & Fichiers associés</h5>
+            
+            <form action="{{ url_for('properties.upload_document', property_id=property.id) }}" method="POST" enctype="multipart/form-data" class="mb-4">
+                <div class="row g-2">
+                    <div class="col-8">
+                        <input class="form-control form-control-premium" type="file" name="document" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required>
+                    </div>
+                    <div class="col-4">
+                        <button type="submit" class="btn btn-premium w-100 rounded-3">Ajouter</button>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <input type="text" name="nom_document" class="form-control form-control-premium" placeholder="Nom personnalisé (Ex: Titre de propriété)">
+                </div>
+            </form>
+
+            {% if property.documents %}
+            <div class="list-group list-group-flush border-top">
+                {% for doc in property.documents %}
+                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <div class="text-truncate" style="max-width: 80%;">
+                        <i class="fa-solid fa-file-pdf text-danger me-2"></i>
+                        <a href="{{ url_for('static', filename=doc.chemin_fichier) }}" target="_blank" class="text-decoration-none text-dark fw-semibold small">{{ doc.nom_document }}</a>
+                        <small class="text-muted d-block" style="font-size: 0.7rem;">Ajouté le {{ doc.date_upload.strftime('%d/%m/%Y') }}</small>
+                    </div>
+                    <form action="{{ url_for('properties.delete_document', doc_id=doc.id) }}" method="POST" onsubmit="return confirm('Retirer ce document ?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle"><i class="fa-solid fa-trash-can"></i></button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0">Aucun document administratif téléversé pour le moment.</p>
+            {% endif %}
+        </div>
+
+        <!-- Visites planifiées sur ce bien -->
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-calendar-days text-warning me-2"></i>Visites de ce bien</h5>
+                <button type="button" class="btn btn-accent btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#scheduleVisitModal">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+
+            {% if property.visites %}
+            <div class="list-group list-group-flush">
+                {% for visit in property.visites %}
+                <div class="list-group-item px-0 py-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-dark small">{{ visit.date_visite.strftime('%d/%m/%Y à %H:%M') }}</span>
+                        <span class="badge bg-opacity-10 
+                            {% if visit.statut == 'Planifiée' %}bg-warning text-warning
+                            {% elif visit.statut == 'Effectuée' %}bg-success text-success
+                            {% else %}bg-danger text-danger{% endif %} rounded-pill" style="font-size: 0.7rem;">
+                            {{ visit.statut }}
+                        </span>
+                    </div>
+                    <small class="text-muted d-block">Client : {{ visit.client.prenom }} {{ visit.client.nom }}</small>
+                    <small class="text-muted d-block">Agent : {{ visit.agent.prenom }} {{ visit.agent.nom }}</small>
+                    {% if visit.compte_rendu %}
+                    <p class="text-dark small border-start ps-2 mt-2 mb-0">{{ visit.compte_rendu }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted small mb-0">Aucune visite planifiée sur ce bien immobilier.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Planification Visite -->
+<div class="modal fade" id="scheduleVisitModal" tabindex="-1" aria-labelledby="scheduleVisitModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-3 shadow border-0">
+            <div class="modal-header border-bottom-0 bg-light rounded-top-3">
+                <h5 class="modal-title fw-bold" id="scheduleVisitModalLabel"><i class="fa-solid fa-calendar-plus text-warning me-2"></i>Planifier une visite</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('properties.add_visit', property_id=property.id) }}" method="POST">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label for="client_id" class="form-label fw-semibold">Client visiteur</label>
+                        <select class="form-select form-control-premium" id="client_id" name="client_id" required>
+                            <option value="">-- Choisir un client --</option>
+                            {% for c in clients %}
+                            <option value="{{ c.id }}">{{ c.prenom }} {{ c.nom }} ({{ c.code_client }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="agent_id" class="form-label fw-semibold">Agent d'accompagnement</label>
+                        <select class="form-select form-control-premium" id="agent_id" name="agent_id" required>
+                            <option value="">-- Choisir un agent --</option>
+                            {% for a in agents %}
+                            <option value="{{ a.id }}" {% if a.id == current_user.id %}selected{% endif %}>{{ a.prenom }} {{ a.nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label for="date_visite" class="form-label fw-semibold">Date</label>
+                            <input type="date" class="form-control form-control-premium" id="date_visite" name="date_visite" required>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label for="heure_visite" class="form-label fw-semibold">Heure</label>
+                            <input type="time" class="form-control form-control-premium" id="heure_visite" name="heure_visite" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="compte_rendu" class="form-label fw-semibold">Notes préliminaires / Consignes</label>
+                        <textarea class="form-control form-control-premium" id="compte_rendu" name="compte_rendu" rows="3" placeholder="Rendez-vous sur place, clés à récupérer à l'agence..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 p-3 bg-light rounded-bottom-3 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Fermer</button>
+                    <button type="submit" class="btn btn-accent rounded-3">Confirmer et planifier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

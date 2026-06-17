@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Transactions - Ciento Immobilier{% endblock %}
+{% block header_title %}Transactions Commerciales{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card-premium">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-handshake text-warning me-2"></i>Suivi des ventes et locations</h5>
+                
+                <div class="d-flex flex-wrap gap-2">
+                    <!-- Filtres -->
+                    <form method="GET" action="{{ url_for('transactions.list_transactions') }}" class="d-flex align-items-center gap-2">
+                        <input type="text" name="search" class="form-control form-control-premium" placeholder="Référence..." value="{{ search }}">
+                        
+                        <select name="type_transaction" class="form-select form-control-premium">
+                            <option value="">Tous les types</option>
+                            <option value="Vente" {% if type_transaction == 'Vente' %}selected{% endif %}>Vente</option>
+                            <option value="Location" {% if type_transaction == 'Location' %}selected{% endif %}>Location</option>
+                        </select>
+
+                        <select name="statut" class="form-select form-control-premium">
+                            <option value="">Tous les statuts</option>
+                            <option value="En cours" {% if statut == 'En cours' %}selected{% endif %}>En cours</option>
+                            <option value="Finalisée" {% if statut == 'Finalisée' %}selected{% endif %}>Finalisée</option>
+                            <option value="Annulée" {% if statut == 'Annulée' %}selected{% endif %}>Annulée</option>
+                        </select>
+
+                        <button class="btn btn-premium" type="submit"><i class="fa-solid fa-search"></i></button>
+                    </form>
+                    
+                    {% if search or type_transaction or statut %}
+                    <a href="{{ url_for('transactions.list_transactions') }}" class="btn btn-outline-secondary" title="Réinitialiser"><i class="fa-solid fa-arrow-rotate-left"></i></a>
+                    {% endif %}
+
+                    <a href="{{ url_for('transactions.add_transaction') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-1"></i> Saisir Transaction</a>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Réf. Transaction</th>
+                            <th>Type</th>
+                            <th>Bien associé</th>
+                            <th>Client acquéreur</th>
+                            <th>Agent commercial</th>
+                            <th>Montant de l'opération</th>
+                            <th>Date d'opération</th>
+                            <th>Statut</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in transactions %}
+                        <tr>
+                            <td><span class="badge bg-light text-dark font-monospace">#{{ tx.reference_transaction }}</span></td>
+                            <td>
+                                <span class="badge {% if tx.type_transaction == 'Vente' %}bg-primary{% else %}bg-info{% endif %} rounded-pill px-2 py-1">
+                                    {{ tx.type_transaction }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="text-dark fw-semibold">{{ tx.propriete.reference_bien }}</span> - <small class="text-muted">{{ tx.propriete.type_bien }}</small>
+                            </td>
+                            <td>{{ tx.client.prenom }} {{ tx.client.nom }}</td>
+                            <td>{{ tx.agent.prenom }} {{ tx.agent.nom }}</td>
+                            <td class="fw-bold text-accent">{{ tx.montant | format_price(tx.propriete.devise) }}</td>
+                            <td>{{ tx.date_transaction.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <span class="badge bg-opacity-10 
+                                    {% if tx.statut == 'Finalisée' %}bg-success text-success
+                                    {% elif tx.statut == 'En cours' %}bg-warning text-warning
+                                    {% else %}bg-danger text-danger{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    {{ tx.statut }}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('transactions.view_transaction', tx_id=tx.id) }}" class="btn btn-sm btn-outline-primary rounded-3 me-1" title="Détails / Contrats"><i class="fa-solid fa-eye"></i></a>
+                                {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                                <form action="{{ url_for('transactions.delete_transaction', tx_id=tx.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette transaction ? Le bien immobilier associé redeviendra disponible.');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted">Aucune transaction trouvée correspondant aux critères.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

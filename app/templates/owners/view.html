@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Profil Propriétaire - {{ owner.prenom }} {{ owner.nom }}{% endblock %}
+{% block header_title %}Fiche Propriétaire{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Colonne Gauche : Détails du Propriétaire -->
+    <div class="col-lg-4 col-md-12 mb-4">
+        <div class="card-premium h-100">
+            <div class="text-center pb-4 border-bottom">
+                <div class="bg-warning text-dark rounded-circle d-inline-flex align-items-center justify-content-center fw-bold mb-3 shadow" style="width: 80px; height: 80px; font-size: 2.2rem;">
+                    {{ owner.prenom[0]|upper }}{{ owner.nom[0]|upper }}
+                </div>
+                <h4 class="fw-bold text-dark mb-1">{{ owner.prenom }} {{ owner.nom }}</h4>
+                <span class="badge bg-secondary px-3 py-2 rounded-pill small">Propriétaire bailleur/vendeur</span>
+            </div>
+
+            <div class="py-4">
+                <h6 class="text-muted text-uppercase fw-semibold mb-3" style="font-size: 0.75rem;">Coordonnées de contact</h6>
+                
+                <div class="mb-3 d-flex align-items-start">
+                    <span class="text-muted me-3 fs-5"><i class="fa-solid fa-phone"></i></span>
+                    <div>
+                        <small class="text-muted d-block small">Téléphone</small>
+                        <span class="text-dark fw-semibold">{{ owner.telephone or 'N/A' }}</span>
+                    </div>
+                </div>
+
+                <div class="mb-3 d-flex align-items-start">
+                    <span class="text-muted me-3 fs-5"><i class="fa-solid fa-envelope"></i></span>
+                    <div>
+                        <small class="text-muted d-block small">E-mail</small>
+                        {% if owner.email %}
+                        <a href="mailto:{{ owner.email }}" class="text-accent fw-semibold text-decoration-none">{{ owner.email }}</a>
+                        {% else %}
+                        <span class="text-dark fw-semibold">N/A</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-3 d-flex align-items-start">
+                    <span class="text-muted me-3 fs-5"><i class="fa-solid fa-location-dot"></i></span>
+                    <div>
+                        <small class="text-muted d-block small">Adresse de résidence</small>
+                        <span class="text-dark fw-semibold">{{ owner.adresse or 'N/A' }}</span>
+                    </div>
+                </div>
+
+                <div class="mb-3 d-flex align-items-start border-top pt-3">
+                    <span class="text-muted me-3 fs-5"><i class="fa-solid fa-id-card"></i></span>
+                    <div>
+                        <small class="text-muted d-block small">Identité (CNI/Passeport)</small>
+                        <span class="text-dark fw-semibold font-monospace">{{ owner.numero_identite or 'N/A' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            {% if owner.observations %}
+            <div class="border-top pt-3">
+                <h6 class="text-muted text-uppercase fw-semibold mb-2" style="font-size: 0.75rem;">Observations & Notes</h6>
+                <div class="bg-light p-3 rounded-3 small text-dark" style="white-space: pre-line;">
+                    {{ owner.observations }}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="d-grid gap-2 mt-auto border-top pt-4">
+                <a href="{{ url_for('owners.edit_owner', owner_id=owner.id) }}" class="btn btn-premium w-100"><i class="fa-solid fa-user-pen me-2"></i>Modifier la fiche</a>
+                
+                {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                <form action="{{ url_for('owners.delete_owner', owner_id=owner.id) }}" method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce propriétaire ?');">
+                    <button type="submit" class="btn btn-outline-danger w-100"><i class="fa-solid fa-trash-can me-2"></i>Supprimer le propriétaire</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Colonne Droite : Biens Immobiliers associés -->
+    <div class="col-lg-8 col-md-12">
+        <div class="card-premium h-100">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-house-user text-warning me-2"></i>Biens immobiliers associés</h5>
+            
+            {% if owner.proprietes %}
+            <div class="row">
+                {% for prop in owner.proprietes %}
+                <div class="col-md-6 mb-3">
+                    <div class="border rounded p-3 bg-light d-flex flex-column h-100 position-relative">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="text-muted small font-monospace">{{ prop.reference_bien }}</span>
+                            <span class="badge badge-status badge-{{ prop.statut|lower }}">{{ prop.statut }}</span>
+                        </div>
+                        
+                        <h6 class="fw-bold text-dark text-truncate mb-2">{{ prop.titre }}</h6>
+                        
+                        <div class="text-muted small mb-3">
+                            <i class="fa-solid fa-map-marker-alt me-1"></i>{{ prop.ville }}, {{ prop.quartier or '' }}
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
+                            <span class="fw-bold text-accent">{{ prop.prix | format_price(prop.devise) }}</span>
+                            <a href="{{ url_for('properties.view_property', property_id=prop.id) }}" class="btn btn-sm btn-premium py-1 px-2 rounded-2">Fiche du bien</a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fa-solid fa-house-laptop text-muted fs-1 mb-3"></i>
+                <h6 class="fw-bold text-dark">Aucun bien lié à ce propriétaire</h6>
+                <p class="text-muted small mb-0">Vous pouvez lier un bien à ce propriétaire depuis le catalogue des biens immobiliers.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

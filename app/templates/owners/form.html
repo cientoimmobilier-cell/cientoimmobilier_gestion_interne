@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action_title }} - Ciento Immobilier{% endblock %}
+{% block header_title %}{{ action_title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-md-12">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-user-shield text-warning me-2"></i>Informations personnelles du propriétaire</h5>
+            
+            <form method="POST">
+                <div class="row">
+                    <!-- Prénom -->
+                    <div class="col-md-6 mb-3">
+                        <label for="prenom" class="form-label fw-semibold" style="font-size: 0.9rem;">Prénom</label>
+                        <input type="text" class="form-control form-control-premium" id="prenom" name="prenom" placeholder="Jean" value="{{ owner.prenom if owner else '' }}" required>
+                    </div>
+                    <!-- Nom -->
+                    <div class="col-md-6 mb-3">
+                        <label for="nom" class="form-label fw-semibold" style="font-size: 0.9rem;">Nom de famille</label>
+                        <input type="text" class="form-control form-control-premium" id="nom" name="nom" placeholder="DUPONT" value="{{ owner.nom if owner else '' }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Téléphone -->
+                    <div class="col-md-6 mb-3">
+                        <label for="telephone" class="form-label fw-semibold" style="font-size: 0.9rem;">Téléphone principal</label>
+                        <input type="tel" class="form-control form-control-premium" id="telephone" name="telephone" placeholder="+33 6 12 34 56 78" value="{{ owner.telephone if owner else '' }}">
+                    </div>
+                    <!-- Email -->
+                    <div class="col-md-6 mb-3">
+                        <label for="email" class="form-label fw-semibold" style="font-size: 0.9rem;">Adresse e-mail</label>
+                        <input type="email" class="form-control form-control-premium" id="email" name="email" placeholder="jean.dupont@exemple.com" value="{{ owner.email if owner else '' }}">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- N° d'identité -->
+                    <div class="col-md-12 mb-3">
+                        <label for="numero_identite" class="form-label fw-semibold" style="font-size: 0.9rem;">Numéro de pièce d'identité (CNI / Passeport)</label>
+                        <input type="text" class="form-control form-control-premium" id="numero_identite" name="numero_identite" placeholder="CNI-901828" value="{{ owner.numero_identite if owner else '' }}">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="adresse" class="form-label fw-semibold" style="font-size: 0.9rem;">Adresse de résidence</label>
+                    <textarea class="form-control form-control-premium" id="adresse" name="adresse" rows="2" placeholder="12 Rue de la Paix, 75002 Paris">{{ owner.adresse if owner else '' }}</textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label for="observations" class="form-label fw-semibold" style="font-size: 0.9rem;">Observations / Notes privées</label>
+                    <textarea class="form-control form-control-premium" id="observations" name="observations" rows="4" placeholder="Préférences de contact, horaires disponibles, remarques générales...">{{ owner.observations if owner else '' }}</textarea>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-4">
+                    <a href="{{ url_for('owners.list_owners') }}" class="btn btn-outline-secondary rounded-3">Annuler</a>
+                    <button type="submit" class="btn btn-accent rounded-3 px-4">Enregistrer la fiche</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

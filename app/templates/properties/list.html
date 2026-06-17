@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Biens Immobiliers - Ciento Immobilier{% endblock %}
+{% block header_title %}Catalogue Immobilier{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Barre de filtres de recherche -->
+    <div class="col-12 mb-4">
+        <div class="card-premium py-3 px-4 mb-0">
+            <form method="GET" action="{{ url_for('properties.list_properties') }}" class="row g-3 align-items-center">
+                <div class="col-lg-3 col-md-6">
+                    <label class="form-label text-muted fw-semibold small mb-1">Recherche</label>
+                    <input type="text" name="search" class="form-control form-control-premium" placeholder="Réf, titre, ville, quartier..." value="{{ search }}">
+                </div>
+                
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label text-muted fw-semibold small mb-1">Type de bien</label>
+                    <select name="type_bien" class="form-select form-control-premium">
+                        <option value="">Tous les types</option>
+                        {% for type in property_types %}
+                        <option value="{{ type }}" {% if type_bien == type %}selected{% endif %}>{{ type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label text-muted fw-semibold small mb-1">Statut</label>
+                    <select name="statut" class="form-select form-control-premium">
+                        <option value="">Tous les statuts</option>
+                        <option value="Disponible" {% if statut == 'Disponible' %}selected{% endif %}>Disponible</option>
+                        <option value="Réservé" {% if statut == 'Réservé' %}selected{% endif %}>Réservé</option>
+                        <option value="Vendu" {% if statut == 'Vendu' %}selected{% endif %}>Vendu</option>
+                        <option value="Loué" {% if statut == 'Loué' %}selected{% endif %}>Loué</option>
+                        <option value="Suspendu" {% if statut == 'Suspendu' %}selected{% endif %}>Suspendu</option>
+                    </select>
+                </div>
+
+                <div class="col-lg-2 col-md-6">
+                    <label class="form-label text-muted fw-semibold small mb-1">Prix maximum (€)</label>
+                    <input type="number" name="prix_max" class="form-control form-control-premium" placeholder="Ex: 500000" value="{{ prix_max }}">
+                </div>
+
+                <div class="col-lg-3 col-md-12 d-flex align-items-end gap-2 mt-4 mt-lg-3">
+                    <button type="submit" class="btn btn-premium w-100"><i class="fa-solid fa-sliders me-2"></i>Filtrer</button>
+                    {% if search or type_bien or statut or prix_max %}
+                    <a href="{{ url_for('properties.list_properties') }}" class="btn btn-outline-secondary" title="Réinitialiser"><i class="fa-solid fa-arrow-rotate-left"></i></a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Actions Toolbar -->
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-end gap-2">
+        <a href="{{ url_for('properties.export_properties') }}" class="btn btn-outline-success rounded-3"><i class="fa-solid fa-file-excel me-2"></i>Exporter Excel</a>
+        {% if current_user.role in ['Administrateur', 'Directeur'] %}
+        <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-toggle="modal" data-bs-target="#importPropertiesModal"><i class="fa-solid fa-file-import me-2"></i>Importer Excel</button>
+        {% endif %}
+        <a href="{{ url_for('properties.add_property') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un bien</a>
+    </div>
+</div>
+
+<!-- Liste des biens -->
+<div class="row">
+    {% for prop in properties %}
+    <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+        <div class="card-premium p-0 h-100 overflow-hidden d-flex flex-column">
+            <!-- Image du bien -->
+            <div class="property-img-container">
+                {% if prop.photos %}
+                    {% for photo in prop.photos %}
+                        {% if photo.photo_principale %}
+                            <img src="{{ url_for('static', filename=photo.chemin_fichier) }}" alt="{{ prop.titre }}">
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <!-- Image par défaut élégante (sans placeholder externe) -->
+                    <div class="w-100 h-100 bg-dark d-flex flex-column align-items-center justify-content-center text-warning" style="opacity: 0.9;">
+                        <i class="fa-solid fa-image-portrait fs-1 mb-2"></i>
+                        <span class="small text-uppercase fw-semibold" style="letter-spacing: 1px;">Pas de photo téléversée</span>
+                    </div>
+                {% endif %}
+                
+                <!-- Badge de Statut -->
+                <span class="position-absolute top-0 start-0 m-3 badge badge-status badge-{{ prop.statut|lower }}" style="z-index: 10;">
+                    {{ prop.statut }}
+                </span>
+                
+                <!-- Badge de Type d'opération -->
+                <span class="position-absolute top-0 end-0 m-3 badge {% if prop.type_operation == 'Vente' %}bg-primary{% else %}bg-info{% endif %} text-white rounded-pill px-2 py-1" style="z-index: 10; font-size: 0.75rem;">
+                    À la {{ prop.type_operation }}
+                </span>
+            </div>
+
+            <!-- Contenu du bien -->
+            <div class="p-4 d-flex flex-column flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="text-muted text-uppercase fw-semibold font-monospace" style="font-size: 0.75rem;">{{ prop.reference_bien }}</span>
+                    <span class="badge bg-light text-dark font-monospace" style="font-size: 0.75rem;">{{ prop.type_bien }}</span>
+                </div>
+                
+                <h5 class="fw-bold text-dark text-truncate mb-2">{{ prop.titre }}</h5>
+                
+                <p class="text-muted small mb-3 text-truncate-2" style="min-height: 40px;">{{ prop.description or 'Aucune description disponible pour ce bien immobilier.' }}</p>
+                
+                <div class="d-flex gap-3 text-muted small mb-4 mt-auto">
+                    {% if prop.superficie %}
+                    <span><i class="fa-solid fa-ruler-combined text-warning me-1"></i>{{ prop.superficie }} m²</span>
+                    {% endif %}
+                    {% if prop.nombre_chambres %}
+                    <span><i class="fa-solid fa-bed text-warning me-1"></i>{{ prop.nombre_chambres }} ch.</span>
+                    {% endif %}
+                    {% if prop.nombre_salles_bain %}
+                    <span><i class="fa-solid fa-bath text-warning me-1"></i>{{ prop.nombre_salles_bain }} SdB</span>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                    <div>
+                        <small class="text-muted text-uppercase d-block" style="font-size: 0.65rem; letter-spacing: 0.5px;">Prix demandé</small>
+                        <span class="property-price">{{ prop.prix | format_price(prop.devise) }}</span>
+                    </div>
+                    
+                    <a href="{{ url_for('properties.view_property', property_id=prop.id) }}" class="btn btn-premium btn-sm rounded-3">Voir la fiche</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5">
+        <div class="card-premium">
+            <i class="fa-solid fa-folder-open text-muted fs-1 mb-3"></i>
+            <h5 class="fw-bold text-dark">Aucune propriété disponible</h5>
+            <p class="text-muted mb-0">Modifier vos filtres de recherche ou ajouter une nouvelle fiche immobilière.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Modal Import Excel Propriétés -->
+<div class="modal fade" id="importPropertiesModal" tabindex="-1" aria-labelledby="importPropertiesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-3 shadow border-0">
+            <div class="modal-header border-bottom-0 bg-light rounded-top-3">
+                <h5 class="modal-title fw-bold" id="importPropertiesModalLabel"><i class="fa-solid fa-file-import text-warning me-2"></i>Importer des biens (Excel)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('properties.import_properties') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body p-4">
+                    <p class="small text-muted mb-3">Sélectionnez un fichier Excel (<code>.xlsx</code>). La première ligne doit contenir les en-têtes de colonnes dans l'ordre suivant : <br><strong>Référence, Titre, Type de bien, Opération, Adresse, Ville, Quartier, Prix, Devise, Superficie (m²), Chambres, Salles de bain, Garages, Statut, Propriétaire E-mail, Description</strong>.</p>
+                    <div class="mb-3">
+                        <label for="excel_file" class="form-label fw-semibold">Fichier Excel</label>
+                        <input class="form-control form-control-premium" type="file" id="excel_file" name="excel_file" accept=".xlsx" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 p-3 bg-light rounded-bottom-3 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Fermer</button>
+                    <button type="submit" class="btn btn-accent rounded-3">Importer les données</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

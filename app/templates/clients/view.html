@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Profil Client - {{ client.prenom }} {{ client.nom }}{% endblock %}
+{% block header_title %}Fiche Client #{{ client.code_client }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Colonne Gauche : Infos Personnelles -->
+    <div class="col-lg-4 col-md-12">
+        <div class="card-premium">
+            <div class="text-center mb-4">
+                <div class="bg-warning text-dark rounded-circle d-inline-flex align-items-center justify-content-center fw-bold fs-3 mb-3" style="width: 80px; height: 80px;">
+                    {{ client.prenom[0]|upper }}{{ client.nom[0]|upper }}
+                </div>
+                <h4 class="fw-bold text-dark mb-1">{{ client.prenom }} {{ client.nom }}</h4>
+                <span class="badge bg-light text-dark font-monospace mb-2">#{{ client.code_client }}</span>
+            </div>
+            
+            <hr class="my-4">
+            
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Téléphone principal</small>
+                <span class="text-dark fw-semibold"><i class="fa-solid fa-phone me-2 text-warning"></i>{{ client.telephone or 'Non renseigné' }}</span>
+            </div>
+
+            {% if client.telephone_secondaire %}
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Téléphone secondaire</small>
+                <span class="text-dark"><i class="fa-solid fa-phone me-2 text-muted"></i>{{ client.telephone_secondaire }}</span>
+            </div>
+            {% endif %}
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Adresse e-mail</small>
+                <span class="text-dark">
+                    {% if client.email %}
+                    <i class="fa-solid fa-envelope me-2 text-warning"></i><a href="mailto:{{ client.email }}" class="text-decoration-none text-dark fw-semibold">{{ client.email }}</a>
+                    {% else %}
+                    <i class="fa-solid fa-envelope me-2 text-muted"></i>Non renseigné
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Ville / Adresse</small>
+                <span class="text-dark"><i class="fa-solid fa-location-dot me-2 text-muted"></i>{{ client.adresse or '' }} {{ client.ville or 'Non renseignée' }}</span>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Profession</small>
+                <span class="text-dark"><i class="fa-solid fa-briefcase me-2 text-muted"></i>{{ client.profession or 'Non renseignée' }}</span>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Budget Indicatif</small>
+                <span class="text-dark fw-bold text-accent">
+                    <i class="fa-solid fa-wallet me-2 text-muted"></i>
+                    {% if client.budget_min or client.budget_max %}
+                        {% if client.budget_min %}{{ client.budget_min | format_price(client.devise) }}{% else %}0 {{ client.devise }}{% endif %}
+                        à 
+                        {% if client.budget_max %}{{ client.budget_max | format_price(client.devise) }}{% else %}Illimité{% endif %}
+                    {% else %}
+                        Non spécifié
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Origine du prospect</small>
+                <span class="badge bg-secondary rounded-pill px-2 py-1"><i class="fa-solid fa-share-nodes me-1"></i>{{ client.source_client or 'Inconnue' }}</span>
+            </div>
+
+            <div class="mb-4">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Date d'inscription</small>
+                <span class="text-muted" style="font-size: 0.85rem;"><i class="fa-solid fa-calendar me-2"></i>Le {{ client.date_creation.strftime('%d/%m/%Y à %H:%M') }}</span>
+            </div>
+
+            <div class="d-grid gap-2">
+                <a href="{{ url_for('clients.edit_client', client_id=client.id) }}" class="btn btn-premium w-100 rounded-3"><i class="fa-solid fa-pen-to-square me-2"></i>Modifier le profil</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Colonne Droite : Critères de Recherche et Visites -->
+    <div class="col-lg-8 col-md-12">
+        <!-- Section Demandes / Recherche -->
+        <div class="card-premium mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-magnifying-glass text-warning me-2"></i>Critères de recherche actifs</h5>
+                <button type="button" class="btn btn-accent btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addDemandeModal">
+                    <i class="fa-solid fa-plus me-1"></i> Nouveau critère
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Opération</th>
+                            <th>Type de bien</th>
+                            <th>Zone géographique</th>
+                            <th>Chambres/Salles de bain</th>
+                            <th>Budget Max</th>
+                            <th>Statut</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for demande in client.demandes %}
+                        <tr>
+                            <td>
+                                <span class="badge {% if demande.type_operation == 'Achat' or demande.type_operation == 'Vente' %}bg-primary{% else %}bg-info{% endif %} rounded-pill">
+                                    {{ demande.type_operation }}
+                                </span>
+                            </td>
+                            <td><span class="fw-semibold text-dark">{{ demande.type_bien }}</span></td>
+                            <td>{{ demande.zone_recherche or 'N/A' }}</td>
+                            <td>
+                                <i class="fa-solid fa-bed text-muted me-1"></i>{{ demande.chambres or '-' }} | 
+                                <i class="fa-solid fa-bath text-muted me-1"></i>{{ demande.salles_bain or '-' }}
+                            </td>
+                            <td class="fw-bold">{% if demande.budget %}{{ demande.budget | format_price(demande.devise) }}{% else %}N/A{% endif %}</td>
+                            <td>
+                                <span class="badge bg-opacity-10 
+                                    {% if demande.statut == 'En cours' %}bg-warning text-warning
+                                    {% elif demande.statut == 'Satisfaite' %}bg-success text-success
+                                    {% else %}bg-danger text-danger{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    {{ demande.statut }}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <form action="{{ url_for('clients.delete_demande', demande_id=demande.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Retirer ce critère de recherche ?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle"><i class="fa-solid fa-times"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">Aucun critère de recherche actif. Cliquez sur "Nouveau critère" pour en ajouter.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section Observations & Notes -->
+        <div class="card-premium mb-4">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-clipboard text-warning me-2"></i>Observations internes</h5>
+            <div class="bg-light p-3 rounded-3" style="white-space: pre-line; font-size: 0.95rem;">
+                {{ client.observations or 'Aucune note particulière pour ce client.' }}
+            </div>
+        </div>
+
+        <!-- Section Historique des visites -->
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-calendar-days text-warning me-2"></i>Historique des visites</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date / Heure</th>
+                            <th>Bien visité</th>
+                            <th>Agent en charge</th>
+                            <th>Compte rendu</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for visite in client.visites %}
+                        <tr>
+                            <td>{{ visite.date_visite.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td><span class="fw-semibold text-dark">{{ visite.propriete.reference_bien }}</span> - {{ visite.propriete.titre }}</td>
+                            <td>{{ visite.agent.prenom }} {{ visite.agent.nom }}</td>
+                            <td><small class="text-muted">{{ visite.compte_rendu or 'En attente...' }}</small></td>
+                            <td>
+                                <span class="badge bg-opacity-10 
+                                    {% if visite.statut == 'Effectuée' %}bg-success text-success
+                                    {% elif visite.statut == 'Planifiée' %}bg-warning text-warning
+                                    {% else %}bg-danger text-danger{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    {{ visite.statut }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Aucune visite effectuée ou planifiée à ce jour.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ajout Critère -->
+<div class="modal fade" id="addDemandeModal" tabindex="-1" aria-labelledby="addDemandeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-3 shadow border-0">
+            <div class="modal-header border-bottom-0 bg-light rounded-top-3">
+                <h5 class="modal-title fw-bold" id="addDemandeModalLabel"><i class="fa-solid fa-magnifying-glass text-warning me-2"></i>Nouveau critère de recherche</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('clients.add_demande', client_id=client.id) }}" method="POST">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label for="type_operation" class="form-label fw-semibold">Type d'opération</label>
+                        <select class="form-select form-control-premium" id="type_operation" name="type_operation" required>
+                            <option value="Achat">Achat / Vente</option>
+                            <option value="Location">Location</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="type_bien" class="form-label fw-semibold">Type de bien</label>
+                        <select class="form-select form-control-premium" id="type_bien" name="type_bien" required>
+                            <option value="Maison">Maison</option>
+                            <option value="Appartement">Appartement</option>
+                            <option value="Terrain">Terrain</option>
+                            <option value="Villa">Villa</option>
+                            <option value="Bureau">Bureau</option>
+                            <option value="Local commercial">Local commercial</option>
+                            <option value="Entrepôt">Entrepôt</option>
+                            <option value="Immeuble">Immeuble</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="zone_recherche" class="form-label fw-semibold">Zone géographique de recherche</label>
+                        <input type="text" class="form-control form-control-premium" id="zone_recherche" name="zone_recherche" placeholder="Paris, Bordeaux, Secteur Centre..." required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label for="chambres" class="form-label fw-semibold">Chambres min.</label>
+                            <input type="number" class="form-control form-control-premium" id="chambres" name="chambres" min="0" placeholder="2">
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label for="salles_bain" class="form-label fw-semibold">SdB min.</label>
+                            <input type="number" class="form-control form-control-premium" id="salles_bain" name="salles_bain" min="0" placeholder="1">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-8 mb-3">
+                            <label for="budget" class="form-label fw-semibold">Budget max</label>
+                            <input type="number" step="0.01" class="form-control form-control-premium" id="budget" name="budget" placeholder="350000" required>
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label for="devise" class="form-label fw-semibold">Devise</label>
+                            <select class="form-select form-control-premium" id="devise" name="devise" required>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="HTG">HTG (Gourdes)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 p-3 bg-light rounded-bottom-3 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-toggle="modal">Fermer</button>
+                    <button type="submit" class="btn btn-accent rounded-3">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

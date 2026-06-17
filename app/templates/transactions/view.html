@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}Détails Transaction - {{ tx.reference_transaction }}{% endblock %}
+{% block header_title %}Transaction #{{ tx.reference_transaction }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Colonne Gauche : Détails de la Transaction -->
+    <div class="col-lg-6 col-md-12">
+        <div class="card-premium h-100">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-file-contract text-warning me-2"></i>Résumé de la transaction</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{{ url_for('transactions.download_transaction_pdf', tx_id=tx.id) }}" class="btn btn-sm btn-outline-danger rounded-3" title="Télécharger la fiche transaction PDF"><i class="fa-solid fa-file-pdf me-1"></i>Fiche PDF</a>
+                    <span class="badge bg-opacity-10 
+                        {% if tx.statut == 'Finalisée' %}bg-success text-success
+                        {% elif tx.statut == 'En cours' %}bg-warning text-warning
+                        {% else %}bg-danger text-danger{% endif %} rounded-pill px-3 py-2 fw-bold" style="font-size: 0.85rem;">
+                        {{ tx.statut }}
+                    </span>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="mb-3 row">
+                <small class="col-sm-4 text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Bien immobilier</small>
+                <div class="col-sm-8">
+                    <span class="text-dark fw-bold"><i class="fa-solid fa-home me-2 text-warning"></i>{{ tx.propriete.reference_bien }}</span>
+                    <a href="{{ url_for('properties.view_property', property_id=tx.propriete.id) }}" class="d-block small text-accent text-decoration-none fw-semibold">{{ tx.propriete.titre }}</a>
+                </div>
+            </div>
+
+            <div class="mb-3 row">
+                <small class="col-sm-4 text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Client</small>
+                <div class="col-sm-8">
+                    <span class="text-dark fw-semibold"><i class="fa-solid fa-user me-2 text-muted"></i>{{ tx.client.prenom }} {{ tx.client.nom }}</span>
+                    <a href="{{ url_for('clients.view_client', client_id=tx.client.id) }}" class="d-block small text-muted text-decoration-none font-monospace">#{{ tx.client.code_client }}</a>
+                </div>
+            </div>
+
+            <div class="mb-3 row">
+                <small class="col-sm-4 text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Type d'accord</small>
+                <div class="col-sm-8">
+                    <span class="badge {% if tx.type_transaction == 'Vente' %}bg-primary{% else %}bg-info{% endif %} rounded-pill">{{ tx.type_transaction }}</span>
+                </div>
+            </div>
+
+            <div class="mb-3 row">
+                <small class="col-sm-4 text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Montant global</small>
+                <div class="col-sm-8">
+                    <span class="fs-5 fw-bold text-dark">{{ tx.montant | format_price(tx.devise) }}</span>
+                </div>
+            </div>
+
+            <div class="mb-3 row">
+                <small class="col-sm-4 text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Date d'opération</small>
+                <div class="col-sm-8 text-dark">
+                    <i class="fa-solid fa-calendar me-2 text-muted"></i>{{ tx.date_transaction.strftime('%d/%m/%Y') }}
+                </div>
+            </div>
+
+            {% if commission %}
+            <div class="mb-3 row border-top pt-3">
+                <small class="col-sm-4 text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Commission Agent</small>
+                <div class="col-sm-8">
+                    <span class="fw-bold text-success"><i class="fa-solid fa-percent me-2"></i>{{ commission.pourcentage }}% ({{ commission.montant | format_price(tx.devise) }})</span>
+                    <small class="text-muted d-block">Bénéficiaire : {{ commission.agent.prenom }} {{ commission.agent.nom }}</small>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if tx.observations %}
+            <div class="mb-4 mt-3 border-top pt-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Notes complémentaires</small>
+                <div class="bg-light p-3 rounded-3 small text-dark" style="white-space: pre-line;">
+                    {{ tx.observations }}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if tx.statut == 'En cours' %}
+            <div class="d-grid gap-2 mt-auto border-top pt-4">
+                <form action="{{ url_for('transactions.finalize_transaction', tx_id=tx.id) }}" method="POST" onsubmit="return confirm('Confirmer la signature finale ? Ceci mettra à jour le statut de commercialisation de la propriété.');">
+                    <button type="submit" class="btn btn-accent w-100 py-3 shadow-sm"><i class="fa-solid fa-circle-check me-2"></i>Finaliser la signature & le dossier</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Colonne Droite : Paiements & Contrats signés -->
+    <div class="col-lg-6 col-md-12 mt-4 mt-lg-0">
+        <!-- Section Contrats administratifs -->
+        <div class="card-premium mb-4">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-file-signature text-warning me-2"></i>Documents contractuels</h5>
+            
+            {% if not tx.contrats %}
+            <!-- Formulaire d'upload de contrat -->
+            <form action="{{ url_for('transactions.add_contract', tx_id=tx.id) }}" method="POST" enctype="multipart/form-data" class="mb-0">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="numero_contrat" class="form-label text-muted small fw-semibold">Numéro de contrat</label>
+                        <input type="text" class="form-control form-control-premium" id="numero_contrat" name="numero_contrat" placeholder="Ex: CNT-2026-0041" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="date_signature" class="form-label text-muted small fw-semibold">Date de signature</label>
+                        <input type="date" class="form-control form-control-premium" id="date_signature" name="date_signature" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="date_debut" class="form-label text-muted small fw-semibold">Date d'effet (optionnel)</label>
+                        <input type="date" class="form-control form-control-premium" id="date_debut" name="date_debut">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="date_fin" class="form-label text-muted small fw-semibold">Date d'échéance (optionnel)</label>
+                        <input type="date" class="form-control form-control-premium" id="date_fin" name="date_fin">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="contrat_pdf" class="form-label text-muted small fw-semibold">Fichier du contrat (PDF uniquement)</label>
+                    <input class="form-control form-control-premium" type="file" id="contrat_pdf" name="contrat_pdf" accept=".pdf" required>
+                </div>
+
+                <button type="submit" class="btn btn-premium btn-sm rounded-3"><i class="fa-solid fa-upload me-2"></i>Téléverser le contrat</button>
+            </form>
+            {% else %}
+            <!-- Contrat déjà existant -->
+            {% for contrat in tx.contrats %}
+            <div class="border rounded p-3 bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="badge bg-secondary">Contrat Actif</span>
+                    <span class="font-monospace fw-bold text-dark">#{{ contrat.numero_contrat }}</span>
+                </div>
+                <div class="small text-muted mb-2">Signé le : <span class="text-dark fw-semibold">{{ contrat.date_signature.strftime('%d/%m/%Y') }}</span></div>
+                {% if contrat.date_debut or contrat.date_fin %}
+                <div class="small text-muted mb-3">
+                    Validité : 
+                    <span class="text-dark fw-semibold">
+                        {% if contrat.date_debut %}du {{ contrat.date_debut.strftime('%d/%m/%Y') }}{% endif %}
+                        {% if contrat.date_fin %} au {{ contrat.date_fin.strftime('%d/%m/%Y') }}{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+                
+                {% if contrat.fichier_pdf %}
+                <a href="{{ url_for('static', filename=contrat.fichier_pdf) }}" target="_blank" class="btn btn-premium btn-sm w-100 rounded-3"><i class="fa-solid fa-file-pdf me-2"></i>Consulter le PDF signé</a>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- Section Paiements & Règlements -->
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-cash-register text-warning me-2"></i>Paiements & Versements</h5>
+            
+            <!-- Formulaire d'ajout de paiement -->
+            <form action="{{ url_for('transactions.add_payment', tx_id=tx.id) }}" method="POST" class="mb-4">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="montant_pay" class="form-label text-muted small fw-semibold">Montant payé</label>
+                        <input type="number" step="0.01" class="form-control form-control-premium" id="montant_pay" name="montant" placeholder="Ex: 5000" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="devise" class="form-label text-muted small fw-semibold">Devise</label>
+                        <select class="form-select form-control-premium" id="devise" name="devise" required>
+                            <option value="EUR" {% if tx.devise == 'EUR' %}selected{% endif %}>EUR</option>
+                            <option value="USD" {% if tx.devise == 'USD' %}selected{% endif %}>USD</option>
+                            <option value="HTG" {% if tx.devise == 'HTG' %}selected{% endif %}>HTG</option>
+                        </select>
+                    </div>
+                    <div class="col-md-5 mb-3">
+                        <label for="mode_paiement" class="form-label text-muted small fw-semibold">Mode de règlement</label>
+                        <select class="form-select form-control-premium" id="mode_paiement" name="mode_paiement" required>
+                            <option value="Virement">Virement bancaire</option>
+                            <option value="Chèque">Chèque de banque</option>
+                            <option value="Espèces">Espèces</option>
+                            <option value="Carte">Carte bancaire</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="reference_paiement" class="form-label text-muted small fw-semibold">N° Transaction / Référence</label>
+                        <input type="text" class="form-control form-control-premium" id="reference_paiement" name="reference_paiement" placeholder="Virement-00918">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="date_paiement" class="form-label text-muted small fw-semibold">Date de règlement</label>
+                        <input type="date" class="form-control form-control-premium" id="date_paiement" name="date_paiement" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-premium btn-sm rounded-3"><i class="fa-solid fa-plus me-1"></i> Ajouter Paiement</button>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0 small">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Mode</th>
+                            <th>Référence</th>
+                            <th class="text-end">Montant</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pay in tx.paiements %}
+                        <tr>
+                            <td>{{ pay.date_paiement.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ pay.mode_paiement }}</td>
+                            <td><small class="text-muted font-monospace">{{ pay.reference_paiement or '-' }}</small></td>
+                            <td class="fw-bold text-end text-success">{{ pay.montant | format_price(pay.devise) }}</td>
+                            <td class="text-end">
+                                <a href="{{ url_for('transactions.download_payment_receipt_pdf_route', pay_id=pay.id) }}" class="btn btn-sm btn-outline-danger border-0 rounded-circle" title="Télécharger Reçu PDF"><i class="fa-solid fa-file-pdf"></i></a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-3">Aucun règlement enregistré sur cette affaire.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

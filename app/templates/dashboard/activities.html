@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Journal d'activités - Ciento Immobilier{% endblock %}
+{% block header_title %}Sécurité & Journal d'Audit{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-history text-warning me-2"></i>Journal d'activités des collaborateurs</h5>
+            
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date / Heure</th>
+                            <th>Collaborateur</th>
+                            <th>Rôle</th>
+                            <th>Action effectuée</th>
+                            <th>Module affecté</th>
+                            <th>ID Enregistrement</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.date_action.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                            <td>
+                                <span class="fw-semibold text-dark">
+                                    {% if log.utilisateur %}
+                                        {{ log.utilisateur.prenom }} {{ log.utilisateur.nom }}
+                                    {% else %}
+                                        Système / Supprimé
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                {% if log.utilisateur %}
+                                    <span class="badge bg-secondary">{{ log.utilisateur.role }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ log.action }}</td>
+                            <td>
+                                {% if log.table_concernee %}
+                                    <span class="text-uppercase font-monospace text-muted" style="font-size: 0.85rem;">{{ log.table_concernee }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.enregistrement_id %}
+                                    <span class="badge bg-light text-dark font-monospace">#{{ log.enregistrement_id }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">Aucune activité enregistrée dans le journal.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
