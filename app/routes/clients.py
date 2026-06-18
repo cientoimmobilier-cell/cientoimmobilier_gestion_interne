@@ -38,6 +38,7 @@ def add_client():
         adresse = request.form.get('adresse')
         ville = request.form.get('ville')
         profession = request.form.get('profession')
+        budget_min = request.form.get('budget_min') or None
         budget_max = request.form.get('budget_max') or None
         devise = request.form.get('devise') or 'EUR'
         source_client = request.form.get('source_client')
@@ -90,6 +91,7 @@ def edit_client(client_id):
         client_obj.adresse = request.form.get('adresse')
         client_obj.ville = request.form.get('ville')
         client_obj.profession = request.form.get('profession')
+        client_obj.budget_min = request.form.get('budget_min') or None
         client_obj.budget_max = request.form.get('budget_max') or None
         client_obj.devise = request.form.get('devise') or 'EUR'
         client_obj.source_client = request.form.get('source_client')
