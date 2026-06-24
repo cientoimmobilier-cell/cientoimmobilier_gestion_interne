@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Agents Externes - Ciento Immobilier{% endblock %}
+{% block header_title %}Agents Externes{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h5 class="fw-bold text-dark mb-0">Liste des agents externes</h5>
+    {% if current_user.role in ['Administrateur', 'Directeur'] %}
+    <a href="{{ url_for('agents.add_agent') }}" class="btn btn-accent rounded-3 px-4 shadow-sm">
+        <i class="fa-solid fa-plus me-2"></i>Ajouter un agent
+    </a>
+    {% endif %}
+</div>
+
+<!-- Filtres -->
+<div class="card-premium py-3 px-4 mb-4">
+    <form method="GET" action="{{ url_for('agents.list_agents') }}" class="row g-3 align-items-end">
+        <div class="col-lg-5 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Recherche</label>
+            <input type="text" name="search" class="form-control form-control-premium" placeholder="Nom, prénom, email..." value="{{ search }}">
+        </div>
+        <div class="col-lg-4 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Zone d'affectation</label>
+            <select name="zone" class="form-select form-control-premium">
+                <option value="">Toutes les zones</option>
+                {% for z in zones %}
+                <option value="{{ z }}" {% if zone == z %}selected{% endif %}>{{ z }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-lg-3 col-md-12 d-flex gap-2">
+            <button type="submit" class="btn btn-premium w-100"><i class="fa-solid fa-sliders me-2"></i>Filtrer</button>
+            {% if search or zone %}
+            <a href="{{ url_for('agents.list_agents') }}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-rotate-left"></i></a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Liste des agents sous forme de cartes -->
+<div class="row">
+    {% for agent in agents %}
+    <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+        <div class="card-premium h-100 d-flex flex-column">
+            <div class="d-flex align-items-center mb-3">
+                <!-- Avatar -->
+                <div class="d-flex align-items-center justify-content-center rounded-circle fw-bold me-3" style="width: 56px; height: 56px; background: linear-gradient(135deg, #0f172a, #1e293b); color: #d97706; font-size: 1.2rem;">
+                    {{ agent.prenom[0]|upper }}{{ agent.nom[0]|upper }}
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold text-dark mb-0">{{ agent.prenom }} {{ agent.nom }}</h6>
+                    <small class="text-muted">{{ agent.email }}</small>
+                </div>
+                <div>
+                    {% if agent.actif %}
+                    <span class="badge bg-success rounded-pill">Actif</span>
+                    {% else %}
+                    <span class="badge bg-danger rounded-pill">Inactif</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Zone d'affectation -->
+            <div class="mb-3">
+                {% if agent.zone_affectation %}
+                <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3 py-2" style="font-size: 0.85rem;">
+                    <i class="fa-solid fa-map-location-dot me-1"></i>{{ agent.zone_affectation }}
+                </span>
+                {% else %}
+                <span class="badge bg-light text-muted rounded-pill px-3 py-2" style="font-size: 0.85rem;">
+                    <i class="fa-solid fa-map me-1"></i>Aucune zone affectée
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- Contact -->
+            <div class="mb-3 small">
+                <div class="text-muted mb-1"><i class="fa-solid fa-phone me-2 text-warning"></i>{{ agent.telephone or 'N/A' }}</div>
+                <div class="text-muted"><i class="fa-solid fa-calendar me-2 text-muted"></i>Depuis le {{ agent.date_creation.strftime('%d/%m/%Y') }}</div>
+            </div>
+
+            <!-- Stats rapides -->
+            <div class="row g-2 mb-3 mt-auto">
+                <div class="col-4">
+                    <div class="bg-light rounded-3 p-2 text-center">
+                        <div class="fw-bold text-dark">{{ agent.transactions|length }}</div>
+                        <small class="text-muted" style="font-size: 0.7rem;">Transactions</small>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="bg-light rounded-3 p-2 text-center">
+                        <div class="fw-bold text-dark">{{ agent.visites|length }}</div>
+                        <small class="text-muted" style="font-size: 0.7rem;">Visites</small>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="bg-light rounded-3 p-2 text-center">
+                        <div class="fw-bold text-dark">{{ agent.biens_airbnb_geres|length }}</div>
+                        <small class="text-muted" style="font-size: 0.7rem;">AirBNB</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('agents.view_agent', agent_id=agent.id) }}" class="btn btn-premium btn-sm flex-grow-1 rounded-3">
+                    <i class="fa-solid fa-eye me-1"></i>Voir
+                </a>
+                {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                <a href="{{ url_for('agents.edit_agent', agent_id=agent.id) }}" class="btn btn-outline-secondary btn-sm flex-grow-1 rounded-3">
+                    <i class="fa-solid fa-pen me-1"></i>Modifier
+                </a>
+                <form action="{{ url_for('agents.toggle_agent', agent_id=agent.id) }}" method="POST" class="flex-grow-1 m-0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-{% if agent.actif %}danger{% else %}success{% endif %} btn-sm w-100 rounded-3">
+                        <i class="fa-solid fa-power-off me-1"></i>{% if agent.actif %}Désactiver{% else %}Activer{% endif %}
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5">
+        <div class="card-premium">
+            <i class="fa-solid fa-user-tie text-muted fs-1 mb-3"></i>
+            <h5 class="fw-bold text-dark">Aucun agent externe enregistré</h5>
+            <p class="text-muted mb-3">Ajoutez des agents externes pour les associer aux transactions et visites.</p>
+            {% if current_user.role in ['Administrateur', 'Directeur'] %}
+            <a href="{{ url_for('agents.add_agent') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un agent externe</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

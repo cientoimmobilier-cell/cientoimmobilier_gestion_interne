@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Ciento Immobilier{% endblock %}</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -49,6 +50,31 @@
                         <i class="fa-solid fa-file-invoice-dollar"></i> Transactions
                     </a>
                 </li>
+                <li class="{% if request.blueprint == 'finance' %}active{% endif %}">
+                    <a href="#financeSubmenu" data-bs-toggle="collapse" aria-expanded="false" class="dropdown-toggle">
+                        <i class="fa-solid fa-coins text-warning"></i> Gestion Financière
+                    </a>
+                    <ul class="collapse list-unstyled {% if request.blueprint == 'finance' %}show{% endif %}" id="financeSubmenu">
+                        <li class="{% if request.endpoint == 'finance.recettes' %}active{% endif %}"><a href="{{ url_for('finance.recettes') }}" style="padding-left: 2.5rem; font-size: 0.9em;"><i class="fa-solid fa-arrow-trend-up me-2"></i> Recettes</a></li>
+                        <li class="{% if request.endpoint == 'finance.depenses' %}active{% endif %}"><a href="{{ url_for('finance.depenses') }}" style="padding-left: 2.5rem; font-size: 0.9em;"><i class="fa-solid fa-arrow-trend-down me-2"></i> Dépenses</a></li>
+                        <li class="{% if request.endpoint == 'finance.caisse' %}active{% endif %}"><a href="{{ url_for('finance.caisse') }}" style="padding-left: 2.5rem; font-size: 0.9em;"><i class="fa-solid fa-cash-register me-2"></i> Caisse</a></li>
+                        <li class="{% if request.endpoint == 'finance.banque' %}active{% endif %}"><a href="{{ url_for('finance.banque') }}" style="padding-left: 2.5rem; font-size: 0.9em;"><i class="fa-solid fa-building-columns me-2"></i> Banque</a></li>
+                        <li class="{% if request.endpoint == 'finance.factures' %}active{% endif %}"><a href="{{ url_for('finance.factures') }}" style="padding-left: 2.5rem; font-size: 0.9em;"><i class="fa-solid fa-file-invoice me-2"></i> Factures</a></li>
+                        <li class="{% if request.endpoint == 'finance.recus' %}active{% endif %}"><a href="{{ url_for('finance.recus') }}" style="padding-left: 2.5rem; font-size: 0.9em;"><i class="fa-solid fa-receipt me-2"></i> Reçus</a></li>
+                        <li class="{% if request.endpoint == 'finance.budgets' %}active{% endif %}"><a href="{{ url_for('finance.budgets') }}" style="padding-left: 2.5rem; font-size: 0.9em;"><i class="fa-solid fa-scale-balanced me-2"></i> Budgets</a></li>
+                        <li class="{% if request.endpoint == 'finance.index' %}active{% endif %}"><a href="{{ url_for('finance.index') }}" style="padding-left: 2.5rem; font-size: 0.9em;"><i class="fa-solid fa-chart-pie me-2"></i> Rapports</a></li>
+                    </ul>
+                </li>
+                <li class="{% if request.blueprint == 'airbnb' %}active{% endif %}">
+                    <a href="{{ url_for('airbnb.list_biens') }}">
+                        <i class="fa-solid fa-house-chimney-window" style="color: #ff385c;"></i> Services AirBNB
+                    </a>
+                </li>
+                <li class="{% if request.blueprint == 'agents' %}active{% endif %}">
+                    <a href="{{ url_for('agents.list_agents') }}">
+                        <i class="fa-solid fa-user-tie"></i> Agents Externes
+                    </a>
+                </li>
                 {% if current_user.is_authenticated and current_user.role in ['Administrateur', 'Directeur'] %}
                 <li class="{% if request.blueprint == 'settings' %}active{% endif %}">
                     <a href="{{ url_for('settings.list_users') }}">
@@ -63,11 +89,14 @@
                 {% endif %}
             </ul>
 
-            <div class="p-3 text-center" style="position: absolute; bottom: 0; width: 260px;">
+            <div class="sidebar-bottom p-3 text-center">
                 <hr class="text-secondary">
-                <p class="mb-0 text-muted" style="font-size: 0.8rem;">Local Server Mode</p>
+                <p class="mb-0 text-muted" style="font-size: 0.8rem;">Réseau Local Mode</p>
             </div>
         </nav>
+
+        <!-- Overlay mobile pour sidebar -->
+        <div id="sidebar-overlay"></div>
 
         <!-- Page Content -->
         <div id="content">
@@ -94,6 +123,8 @@
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="userDropdown">
                                     <li><span class="dropdown-item-text text-muted" style="font-size: 0.85rem;">{{ current_user.email }}</span></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}"><i class="fa-solid fa-key me-2 text-warning"></i>Changer le mot de passe</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="fa-solid fa-sign-out-alt me-2"></i>Déconnexion</a></li>
                                 </ul>

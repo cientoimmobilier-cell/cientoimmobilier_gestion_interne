@@ -2,12 +2,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // Bouton de masquage/affichage de la sidebar
     const sidebarCollapse = document.getElementById('sidebarCollapse');
     const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
     
     if (sidebarCollapse && sidebar) {
         sidebarCollapse.addEventListener('click', function() {
             sidebar.classList.toggle('active');
+            if (overlay) {
+                overlay.classList.toggle('active');
+            }
         });
     }
+
+    // Fermer la sidebar en cliquant sur l'overlay
+    if (overlay) {
+        overlay.addEventListener('click', function() {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        });
+    }
+
+    // Fermer la sidebar sur mobile en cliquant sur un lien
+    const sidebarLinks = document.querySelectorAll('#sidebar ul li a');
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth < 992) {
+                sidebar.classList.remove('active');
+                if (overlay) {
+                    overlay.classList.remove('active');
+                }
+            }
+        });
+    });
 
     // Auto-disparition des messages d'alerte Flask après 5 secondes
     const alerts = document.querySelectorAll('.alert-dismissible');

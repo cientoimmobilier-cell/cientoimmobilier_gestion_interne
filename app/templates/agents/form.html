@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}{% if action == 'add' %}Ajouter{% else %}Modifier{% endif %} un agent externe - Ciento Immobilier{% endblock %}
+{% block header_title %}{% if action == 'add' %}Nouvel agent externe{% else %}Modifier {{ agent.prenom }} {{ agent.nom }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-user-plus text-warning me-2"></i>Informations de l'agent</h5>
+            
+            <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="prenom" class="form-label fw-semibold">Prénom</label>
+                        <input type="text" class="form-control form-control-premium" id="prenom" name="prenom" value="{{ agent.prenom if action == 'edit' else '' }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="nom" class="form-label fw-semibold">Nom</label>
+                        <input type="text" class="form-control form-control-premium" id="nom" name="nom" value="{{ agent.nom if action == 'edit' else '' }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="email" class="form-label fw-semibold">Adresse Email</label>
+                        <input type="email" class="form-control form-control-premium" id="email" name="email" value="{{ agent.email if action == 'edit' else '' }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="telephone" class="form-label fw-semibold">Téléphone</label>
+                        <input type="text" class="form-control form-control-premium" id="telephone" name="telephone" value="{{ agent.telephone if action == 'edit' else '' }}">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label for="zone_affectation" class="form-label fw-semibold">Zone d'affectation</label>
+                        <input type="text" class="form-control form-control-premium" id="zone_affectation" name="zone_affectation" value="{{ agent.zone_affectation if action == 'edit' and agent.zone_affectation else '' }}" placeholder="Ex: Paris Centre, Rive Gauche...">
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-4">
+                    <a href="{{ url_for('agents.list_agents') }}" class="btn btn-outline-secondary rounded-3">Annuler</a>
+                    <button type="submit" class="btn btn-accent rounded-3 px-4">{% if action == 'add' %}Créer l'agent{% else %}Enregistrer les modifications{% endif %}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

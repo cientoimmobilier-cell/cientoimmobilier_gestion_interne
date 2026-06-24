@@ -82,6 +82,7 @@
             {% if tx.statut == 'En cours' %}
             <div class="d-grid gap-2 mt-auto border-top pt-4">
                 <form action="{{ url_for('transactions.finalize_transaction', tx_id=tx.id) }}" method="POST" onsubmit="return confirm('Confirmer la signature finale ? Ceci mettra à jour le statut de commercialisation de la propriété.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-accent w-100 py-3 shadow-sm"><i class="fa-solid fa-circle-check me-2"></i>Finaliser la signature & le dossier</button>
                 </form>
             </div>
@@ -98,6 +99,7 @@
             {% if not tx.contrats %}
             <!-- Formulaire d'upload de contrat -->
             <form action="{{ url_for('transactions.add_contract', tx_id=tx.id) }}" method="POST" enctype="multipart/form-data" class="mb-0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="numero_contrat" class="form-label text-muted small fw-semibold">Numéro de contrat</label>
@@ -160,6 +162,7 @@
             
             <!-- Formulaire d'ajout de paiement -->
             <form action="{{ url_for('transactions.add_payment', tx_id=tx.id) }}" method="POST" class="mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label for="montant_pay" class="form-label text-muted small fw-semibold">Montant payé</label>

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Services AirBNB - Ciento Immobilier{% endblock %}
+{% block header_title %}Gestion AirBNB{% endblock %}
+
+{% block content %}
+<!-- Stats rapides -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card-premium card-stat py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Biens enregistrés</div>
+                    <div class="stat-value" style="font-size: 1.6rem;">{{ total_biens }}</div>
+                </div>
+                <div class="text-warning fs-1"><i class="fa-solid fa-house-laptop"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card-premium card-stat py-3" style="border-left-color: #10b981;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Biens actifs</div>
+                    <div class="stat-value" style="font-size: 1.6rem;">{{ biens_actifs }}</div>
+                </div>
+                <div class="text-success fs-1"><i class="fa-solid fa-circle-check"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card-premium card-stat py-3" style="border-left-color: #ef4444;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Réservations ce mois</div>
+                    <div class="stat-value" style="font-size: 1.6rem;">{{ reservations_mois }}</div>
+                </div>
+                <div class="fs-1" style="color: #ef4444;"><i class="fa-solid fa-calendar-check"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtres & Actions -->
+<div class="card-premium py-3 px-4 mb-4">
+    <form method="GET" action="{{ url_for('airbnb.list_biens') }}" class="row g-3 align-items-end">
+        <div class="col-lg-4 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Recherche</label>
+            <input type="text" name="search" class="form-control form-control-premium" placeholder="Référence, titre, ville..." value="{{ search }}">
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Statut</label>
+            <select name="statut" class="form-select form-control-premium">
+                <option value="">Tous</option>
+                <option value="Actif" {% if statut == 'Actif' %}selected{% endif %}>Actif</option>
+                <option value="Inactif" {% if statut == 'Inactif' %}selected{% endif %}>Inactif</option>
+                <option value="En maintenance" {% if statut == 'En maintenance' %}selected{% endif %}>En maintenance</option>
+            </select>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Ville</label>
+            <input type="text" name="ville" class="form-control form-control-premium" placeholder="Filtrer par ville..." value="{{ ville }}">
+        </div>
+        <div class="col-lg-3 col-md-6 d-flex gap-2">
+            <button type="submit" class="btn btn-premium w-100"><i class="fa-solid fa-sliders me-2"></i>Filtrer</button>
+            {% if search or statut or ville %}
+            <a href="{{ url_for('airbnb.list_biens') }}" class="btn btn-outline-secondary" title="Réinitialiser"><i class="fa-solid fa-arrow-rotate-left"></i></a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- Toolbar -->
+<div class="d-flex justify-content-end gap-2 mb-4">
+    <a href="{{ url_for('airbnb.add_bien') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un bien AirBNB</a>
+</div>
+
+<!-- Liste des biens -->
+<div class="row">
+    {% for bien in biens %}
+    <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+        <div class="card-premium p-0 h-100 overflow-hidden d-flex flex-column">
+            <!-- Header coloré style AirBNB -->
+            <div class="position-relative" style="background: linear-gradient(135deg, #ff385c 0%, #e31c5f 100%); height: 140px; border-radius: 12px 12px 0 0;">
+                <div class="p-4 text-white">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="text-white-50 font-monospace small">{{ bien.reference }}</span>
+                        <span class="badge {% if bien.statut == 'Actif' %}bg-success{% elif bien.statut == 'En maintenance' %}bg-warning text-dark{% else %}bg-secondary{% endif %} rounded-pill">
+                            {{ bien.statut }}
+                        </span>
+                    </div>
+                    <h5 class="fw-bold text-white mt-2 text-truncate mb-1">{{ bien.titre }}</h5>
+                    <small class="text-white-50"><i class="fa-solid fa-location-dot me-1"></i>{{ bien.ville or 'N/A' }}{% if bien.quartier %}, {{ bien.quartier }}{% endif %}</small>
+                </div>
+                <!-- Icône flottante -->
+                <div class="position-absolute bg-white rounded-circle shadow d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; bottom: -25px; right: 20px;">
+                    <i class="fa-solid fa-house-chimney-window text-danger fs-5"></i>
+                </div>
+            </div>
+
+            <div class="p-4 pt-3 d-flex flex-column flex-grow-1">
+                <!-- Infos rapides -->
+                <div class="d-flex flex-wrap gap-3 text-muted small mb-3 mt-2">
+                    <span><i class="fa-solid fa-users me-1 text-danger"></i>{{ bien.capacite }} pers.</span>
+                    {% if bien.nombre_chambres %}<span><i class="fa-solid fa-bed me-1 text-danger"></i>{{ bien.nombre_chambres }} ch.</span>{% endif %}
+                    {% if bien.nombre_salles_bain %}<span><i class="fa-solid fa-bath me-1 text-danger"></i>{{ bien.nombre_salles_bain }} SdB</span>{% endif %}
+                </div>
+
+                <!-- Équipements -->
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% if bien.wifi %}<span class="badge bg-light text-dark"><i class="fa-solid fa-wifi me-1"></i>Wi-Fi</span>{% endif %}
+                    {% if bien.parking %}<span class="badge bg-light text-dark"><i class="fa-solid fa-square-parking me-1"></i>Parking</span>{% endif %}
+                    {% if bien.climatisation %}<span class="badge bg-light text-dark"><i class="fa-solid fa-snowflake me-1"></i>Clim</span>{% endif %}
+                    {% if bien.piscine %}<span class="badge bg-light text-dark"><i class="fa-solid fa-water-ladder me-1"></i>Piscine</span>{% endif %}
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-auto pt-3 border-top">
+                    <div>
+                        <small class="text-muted text-uppercase d-block" style="font-size: 0.65rem;">Prix / nuit</small>
+                        <span class="fw-bold fs-5" style="color: #ff385c;">{{ bien.prix_par_nuit | format_price(bien.devise) }}</span>
+                    </div>
+                    <a href="{{ url_for('airbnb.view_bien', bien_id=bien.id) }}" class="btn btn-sm rounded-3" style="background: #ff385c; color: white;">Voir la fiche</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5">
+        <div class="card-premium">
+            <i class="fa-solid fa-house-chimney-window text-muted fs-1 mb-3"></i>
+            <h5 class="fw-bold text-dark">Aucun bien AirBNB enregistré</h5>
+            <p class="text-muted mb-3">Commencez par ajouter un premier bien à votre portefeuille AirBNB.</p>
+            <a href="{{ url_for('airbnb.add_bien') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un bien</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

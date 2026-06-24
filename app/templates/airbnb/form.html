@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action_title }} - Ciento Immobilier{% endblock %}
+{% block header_title %}{{ action_title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 col-md-12">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-house-chimney-window me-2" style="color: #ff385c;"></i>Informations du bien AirBNB</h5>
+            
+            <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <!-- Section 1: Infos générales -->
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label for="titre" class="form-label fw-semibold">Titre de l'annonce</label>
+                        <input type="text" class="form-control form-control-premium" id="titre" name="titre" placeholder="Superbe appartement lumineux au centre-ville" value="{{ bien.titre if bien else '' }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="type_bien" class="form-label fw-semibold">Type de bien</label>
+                        <select class="form-select form-control-premium" id="type_bien" name="type_bien" required>
+                            <option value="Appartement" {% if bien and bien.type_bien == 'Appartement' %}selected{% endif %}>Appartement</option>
+                            <option value="Maison" {% if bien and bien.type_bien == 'Maison' %}selected{% endif %}>Maison</option>
+                            <option value="Studio" {% if bien and bien.type_bien == 'Studio' %}selected{% endif %}>Studio</option>
+                            <option value="Villa" {% if bien and bien.type_bien == 'Villa' %}selected{% endif %}>Villa</option>
+                            <option value="Chambre privée" {% if bien and bien.type_bien == 'Chambre privée' %}selected{% endif %}>Chambre privée</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label fw-semibold">Description</label>
+                    <textarea class="form-control form-control-premium" id="description" name="description" rows="3" placeholder="Description détaillée du bien, ambiance, proximité...">{{ bien.description if bien else '' }}</textarea>
+                </div>
+
+                <!-- Section 2: Localisation -->
+                <h6 class="fw-bold text-muted text-uppercase mt-4 mb-3" style="font-size: 0.8rem;"><i class="fa-solid fa-location-dot me-2"></i>Localisation</h6>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="ville" class="form-label fw-semibold">Ville</label>
+                        <input type="text" class="form-control form-control-premium" id="ville" name="ville" placeholder="Paris" value="{{ bien.ville if bien else '' }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="quartier" class="form-label fw-semibold">Quartier</label>
+                        <input type="text" class="form-control form-control-premium" id="quartier" name="quartier" placeholder="Marais" value="{{ bien.quartier if bien else '' }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="adresse" class="form-label fw-semibold">Adresse</label>
+                        <input type="text" class="form-control form-control-premium" id="adresse" name="adresse" placeholder="12 Rue de Rivoli" value="{{ bien.adresse if bien else '' }}">
+                    </div>
+                </div>
+
+                <!-- Section 3: Capacité -->
+                <h6 class="fw-bold text-muted text-uppercase mt-4 mb-3" style="font-size: 0.8rem;"><i class="fa-solid fa-bed me-2"></i>Capacité & Chambres</h6>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="capacite" class="form-label fw-semibold">Voyageurs max</label>
+                        <input type="number" class="form-control form-control-premium" id="capacite" name="capacite" min="1" value="{{ bien.capacite if bien else '2' }}" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="nombre_chambres" class="form-label fw-semibold">Chambres</label>
+                        <input type="number" class="form-control form-control-premium" id="nombre_chambres" name="nombre_chambres" min="0" value="{{ bien.nombre_chambres if bien and bien.nombre_chambres else '' }}">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="nombre_lits" class="form-label fw-semibold">Lits</label>
+                        <input type="number" class="form-control form-control-premium" id="nombre_lits" name="nombre_lits" min="0" value="{{ bien.nombre_lits if bien and bien.nombre_lits else '' }}">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="nombre_salles_bain" class="form-label fw-semibold">Salles de bain</label>
+                        <input type="number" class="form-control form-control-premium" id="nombre_salles_bain" name="nombre_salles_bain" min="0" value="{{ bien.nombre_salles_bain if bien and bien.nombre_salles_bain else '' }}">
+                    </div>
+                </div>
+
+                <!-- Section 4: Tarification -->
+                <h6 class="fw-bold text-muted text-uppercase mt-4 mb-3" style="font-size: 0.8rem;"><i class="fa-solid fa-money-bill-wave me-2"></i>Tarification</h6>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="prix_par_nuit" class="form-label fw-semibold">Prix par nuit</label>
+                        <input type="number" step="0.01" class="form-control form-control-premium" id="prix_par_nuit" name="prix_par_nuit" placeholder="85.00" value="{{ bien.prix_par_nuit if bien else '' }}" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="frais_menage" class="form-label fw-semibold">Frais de ménage</label>
+                        <input type="number" step="0.01" class="form-control form-control-premium" id="frais_menage" name="frais_menage" placeholder="30.00" value="{{ bien.frais_menage if bien and bien.frais_menage else '' }}">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="devise" class="form-label fw-semibold">Devise</label>
+                        <select class="form-select form-control-premium" id="devise" name="devise">
+                            <option value="EUR" {% if bien and bien.devise == 'EUR' %}selected{% endif %}>EUR (€)</option>
+                            <option value="USD" {% if bien and bien.devise == 'USD' %}selected{% endif %}>USD ($)</option>
+                            <option value="HTG" {% if bien and bien.devise == 'HTG' %}selected{% endif %}>HTG (Gourdes)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Section 5: Gestion -->
+                <h6 class="fw-bold text-muted text-uppercase mt-4 mb-3" style="font-size: 0.8rem;"><i class="fa-solid fa-users-gear me-2"></i>Gestion</h6>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="proprietaire_id" class="form-label fw-semibold">Propriétaire</label>
+                        <select class="form-select form-control-premium" id="proprietaire_id" name="proprietaire_id">
+                            <option value="">-- Aucun --</option>
+                            {% for prop in proprietaires %}
+                            <option value="{{ prop.id }}" {% if bien and bien.proprietaire_id == prop.id %}selected{% endif %}>{{ prop.prenom }} {{ prop.nom }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="agent_id" class="form-label fw-semibold">Agent gestionnaire</label>
+                        <select class="form-select form-control-premium" id="agent_id" name="agent_id">
+                            <option value="">-- Aucun --</option>
+                            {% for ag in agents %}
+                            <option value="{{ ag.id }}" {% if bien and bien.agent_id == ag.id %}selected{% endif %}>{{ ag.prenom }} {{ ag.nom }}{% if ag.zone_affectation %} ({{ ag.zone_affectation }}){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                {% if bien %}
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="statut" class="form-label fw-semibold">Statut</label>
+                        <select class="form-select form-control-premium" id="statut" name="statut">
+                            <option value="Actif" {% if bien.statut == 'Actif' %}selected{% endif %}>Actif</option>
+                            <option value="Inactif" {% if bien.statut == 'Inactif' %}selected{% endif %}>Inactif</option>
+                            <option value="En maintenance" {% if bien.statut == 'En maintenance' %}selected{% endif %}>En maintenance</option>
+                        </select>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label for="lien_airbnb" class="form-label fw-semibold">Lien vers l'annonce AirBNB</label>
+                    <input type="url" class="form-control form-control-premium" id="lien_airbnb" name="lien_airbnb" placeholder="https://www.airbnb.com/rooms/..." value="{{ bien.lien_airbnb if bien else '' }}">
+                </div>
+
+                <!-- Section 6: Équipements -->
+                <h6 class="fw-bold text-muted text-uppercase mt-4 mb-3" style="font-size: 0.8rem;"><i class="fa-solid fa-couch me-2"></i>Équipements</h6>
+                <div class="d-flex flex-wrap gap-4 mb-4">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="wifi" name="wifi" {% if bien and bien.wifi %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="wifi"><i class="fa-solid fa-wifi me-1 text-muted"></i>Wi-Fi</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="parking" name="parking" {% if bien and bien.parking %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="parking"><i class="fa-solid fa-square-parking me-1 text-muted"></i>Parking</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="climatisation" name="climatisation" {% if bien and bien.climatisation %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="climatisation"><i class="fa-solid fa-snowflake me-1 text-muted"></i>Climatisation</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="piscine" name="piscine" {% if bien and bien.piscine %}checked{% endif %}>
+                        <label class="form-check-label fw-semibold" for="piscine"><i class="fa-solid fa-water-ladder me-1 text-muted"></i>Piscine</label>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="observations" class="form-label fw-semibold">Observations / Notes internes</label>
+                    <textarea class="form-control form-control-premium" id="observations" name="observations" rows="3" placeholder="Notes privées sur ce bien...">{{ bien.observations if bien else '' }}</textarea>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-4">
+                    <a href="{{ url_for('airbnb.list_biens') }}" class="btn btn-outline-secondary rounded-3">Annuler</a>
+                    <button type="submit" class="btn rounded-3 px-4 text-white" style="background: #ff385c;">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

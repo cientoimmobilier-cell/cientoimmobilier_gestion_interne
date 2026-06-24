@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
+from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
 from flask_login import login_required, current_user
 from app.models import Proprietaire, Propriete
-from app.utils import log_activity
+from app.utils.helpers import log_activity
 from app import db
 from datetime import datetime
+from app.services.excel_service import export_owners_to_excel, import_owners_from_excel
 
 owners = Blueprint('owners', __name__)
 
@@ -105,5 +106,74 @@ def delete_owner(owner_id):
     except Exception as e:
         db.session.rollback()
         flash(f"Impossible de supprimer ce propriétaire: {e}", "danger")
+        
+    return redirect(url_for('owners.list_owners'))
+
+@owners.route('/exporter')
+@login_required
+def export_owners():
+    owners_list = Proprietaire.query.order_by(Proprietaire.nom.asc()).all()
+    excel_file = export_owners_to_excel(owners_list)
+    log_activity(current_user.id, "Exportation Excel du portefeuille propriétaires", "proprietaires")
+    return send_file(
+        excel_file,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name="Portefeuille_Proprietaires.xlsx"
+    )
+
+@owners.route('/importer', methods=['POST'])
+@login_required
+def import_owners():
+    if current_user.role not in ['Administrateur', 'Directeur']:
+        abort(403)
+        
+    if 'excel_file' not in request.files:
+        flash("Aucun fichier envoyé.", "warning")
+        return redirect(url_for('owners.list_owners'))
+        
+    file = request.files['excel_file']
+    if not file or file.filename == '':
+        flash("Fichier invalide.", "warning")
+        return redirect(url_for('owners.list_owners'))
+        
+    try:
+        owners_data = import_owners_from_excel(file)
+        imported_count = 0
+        updated_count = 0
+        
+        for data in owners_data:
+            existing = None
+            if data["email"]:
+                existing = Proprietaire.query.filter_by(email=data["email"]).first()
+                
+            if existing:
+                existing.nom = data["nom"]
+                existing.prenom = data["prenom"]
+                existing.telephone = data["telephone"]
+                existing.adresse = data["adresse"]
+                existing.numero_identite = data["numero_identite"]
+                existing.observations = data["observations"]
+                updated_count += 1
+            else:
+                new_owner = Proprietaire(
+                    nom=data["nom"],
+                    prenom=data["prenom"],
+                    telephone=data["telephone"],
+                    email=data["email"],
+                    adresse=data["adresse"],
+                    numero_identite=data["numero_identite"],
+                    observations=data["observations"]
+                )
+                db.session.add(new_owner)
+                db.session.flush()
+                imported_count += 1
+                
+        db.session.commit()
+        log_activity(current_user.id, f"Importation Excel propriétaires : {imported_count} créés, {updated_count} mis à jour", "proprietaires")
+        flash(f"Importation réussie : {imported_count} propriétaires créés, {updated_count} fiches mises à jour.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erreur d'importation : {e}", "danger")
         
     return redirect(url_for('owners.list_owners'))

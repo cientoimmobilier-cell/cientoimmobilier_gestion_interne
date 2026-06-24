@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion Bancaire - Ciento Immobilier{% endblock %}
+{% block header_title %}Gestion Bancaire{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">Mouvements Bancaires Récents</h5>
+                <button class="btn btn-accent btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addBanqueModal"><i class="fa-solid fa-plus me-1"></i> Nouveau Compte</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Montant</th>
+                            <th>Compte</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mvt in mouvements %}
+                        <tr>
+                            <td>{{ mvt.date_mouvement.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <span class="badge {% if mvt.type_mouvement == 'Recette' %}bg-success{% else %}bg-danger{% endif %} rounded-pill px-2 py-1">
+                                    {{ mvt.type_mouvement }}
+                                </span>
+                            </td>
+                            <td class="fw-bold {% if mvt.type_mouvement == 'Recette' %}text-success{% else %}text-danger{% endif %}">
+                                {{ mvt.montant | format_price }}
+                            </td>
+                            <td>{{ mvt.compte_bancaire.nom_banque if mvt.compte_bancaire else '-' }}</td>
+                            <td>{{ mvt.description or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Aucun mouvement bancaire enregistré.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ajout Compte -->
+<div class="modal fade" id="addBanqueModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light border-0">
+                <h5 class="modal-title fw-bold text-dark">Ajouter un Compte Bancaire</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('finance.add_banque') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Nom de la Banque</label>
+                        <input type="text" class="form-control form-control-premium" name="nom_banque" required placeholder="Ex: Société Générale">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Numéro de Compte / IBAN</label>
+                        <input type="text" class="form-control form-control-premium" name="numero_compte" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Titulaire du compte</label>
+                        <input type="text" class="form-control form-control-premium" name="titulaire">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Solde Initial</label>
+                            <input type="number" step="0.01" class="form-control form-control-premium" name="solde" value="0" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Devise</label>
+                            <select class="form-select form-control-premium" name="devise" required>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="HTG">HTG</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-accent rounded-3">Créer le Compte</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -51,18 +51,27 @@
                             <span class="badge bg-danger">Inactif</span>
                         {% endif %}
                     </td>
-                    <td class="text-end">
-                        <a href="{{ url_for('settings.edit_user', id=user.id) }}" class="btn btn-sm btn-outline-primary" title="Modifier">
-                            <i class="fa-solid fa-pen"></i>
-                        </a>
-                        {% if current_user.id != user.id %}
-                        <form action="{{ url_for('settings.delete_user', id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Voulez-vous vraiment supprimer cet utilisateur ? Cette action est irréversible.');">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </form>
-                        {% endif %}
-                    </td>
+                        <td class="text-end">
+                        <div class="d-flex justify-content-end gap-1 flex-wrap">
+                            <a href="{{ url_for('settings.edit_user', id=user.id) }}" class="btn btn-sm btn-outline-primary rounded-3" title="Modifier">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            {% if current_user.id != user.id %}
+                            <form action="{{ url_for('settings.reset_user_password', id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Réinitialiser le mot de passe de {{ user.prenom }} {{ user.nom }} ? Un nouveau mot de passe sera généré.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-warning rounded-3" title="Réinitialiser le mot de passe">
+                                    <i class="fa-solid fa-key"></i>
+                                </button>
+                            </form>
+                            <form action="{{ url_for('settings.delete_user', id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Voulez-vous vraiment supprimer cet utilisateur ? Cette action est irréversible.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        </td>
                 </tr>
                 {% else %}
                 <tr>

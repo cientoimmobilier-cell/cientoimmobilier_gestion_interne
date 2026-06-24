@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Budgets - Ciento Immobilier{% endblock %}
+{% block header_title %}Gestion des Budgets{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">Budgets Définis</h5>
+                <button class="btn btn-accent btn-sm rounded-3"><i class="fa-solid fa-scale-balanced me-1"></i> Nouveau budget</button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Année / Mois</th>
+                            <th>Catégorie</th>
+                            <th>Montant Prévu</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for budget in budgets %}
+                        <tr>
+                            <td>{{ budget.annee }}{% if budget.mois %} / {{ budget.mois }}{% else %} (Annuel){% endif %}</td>
+                            <td class="fw-bold">{{ budget.categorie }}</td>
+                            <td class="fw-bold text-primary">{{ budget.montant_prevu | format_price }}</td>
+                            <td>{{ budget.description or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">Aucun budget enregistré.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

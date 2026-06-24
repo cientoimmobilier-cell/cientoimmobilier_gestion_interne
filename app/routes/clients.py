@@ -1,10 +1,10 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
 from flask_login import login_required, current_user
 from app.models import Client, DemandeClient
-from app.utils import log_activity
+from app.utils.helpers import log_activity
 from app import db
 from datetime import datetime
-from app.excel_utils import export_clients_to_excel, import_clients_from_excel
+from app.services.excel_service import export_clients_to_excel, import_clients_from_excel
 
 clients = Blueprint('clients', __name__)
 
@@ -38,6 +38,8 @@ def add_client():
         adresse = request.form.get('adresse')
         ville = request.form.get('ville')
         profession = request.form.get('profession')
+        zone_ciblee = request.form.get('zone_ciblee')
+        description = request.form.get('description')
         budget_min = request.form.get('budget_min') or None
         budget_max = request.form.get('budget_max') or None
         devise = request.form.get('devise') or 'EUR'
@@ -58,6 +60,8 @@ def add_client():
             adresse=adresse,
             ville=ville,
             profession=profession,
+            zone_ciblee=zone_ciblee,
+            description=description,
             budget_min=budget_min,
             budget_max=budget_max,
             devise=devise,
@@ -91,6 +95,8 @@ def edit_client(client_id):
         client_obj.adresse = request.form.get('adresse')
         client_obj.ville = request.form.get('ville')
         client_obj.profession = request.form.get('profession')
+        client_obj.zone_ciblee = request.form.get('zone_ciblee')
+        client_obj.description = request.form.get('description')
         client_obj.budget_min = request.form.get('budget_min') or None
         client_obj.budget_max = request.form.get('budget_max') or None
         client_obj.devise = request.form.get('devise') or 'EUR'
@@ -147,6 +153,7 @@ def add_demande(client_id):
     salles_bain = request.form.get('salles_bain') or None
     budget = request.form.get('budget') or None
     devise = request.form.get('devise') or 'EUR'
+    etat_demande = request.form.get('etat_demande') or 'Pas urgence'
     
     new_demande = DemandeClient(
         client_id=client_id,
@@ -157,7 +164,8 @@ def add_demande(client_id):
         salles_bain=salles_bain,
         budget=budget,
         devise=devise,
-        statut='En cours'
+        etat_demande=etat_demande,
+        statut='Recherche'
     )
     
     try:
@@ -234,6 +242,8 @@ def import_clients():
                 existing.adresse = data["adresse"]
                 existing.ville = data["ville"]
                 existing.profession = data.get("profession")
+                existing.zone_ciblee = data.get("zone_ciblee")
+                existing.description = data.get("description")
                 existing.budget_min = data.get("budget_min")
                 existing.budget_max = data.get("budget_max")
                 existing.devise = data.get("devise", "EUR")
@@ -252,7 +262,10 @@ def import_clients():
                     telephone_secondaire=data["telephone_secondaire"],
                     email=data["email"],
                     adresse=data["adresse"],
+                    ville=data.get("ville"),
                     profession=data.get("profession"),
+                    zone_ciblee=data.get("zone_ciblee"),
+                    description=data.get("description"),
                     budget_min=data.get("budget_min"),
                     budget_max=data.get("budget_max"),
                     devise=data.get("devise", "EUR"),

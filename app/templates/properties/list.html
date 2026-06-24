@@ -149,6 +149,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="{{ url_for('properties.import_properties') }}" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body p-4">
                     <p class="small text-muted mb-3">Sélectionnez un fichier Excel (<code>.xlsx</code>). La première ligne doit contenir les en-têtes de colonnes dans l'ordre suivant : <br><strong>Référence, Titre, Type de bien, Opération, Adresse, Ville, Quartier, Prix, Devise, Superficie (m²), Chambres, Salles de bain, Garages, Statut, Propriétaire E-mail, Description</strong>.</p>
                     <div class="mb-3">

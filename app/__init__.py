@@ -3,17 +3,19 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
+from flask_wtf.csrf import CSRFProtect
 
 # Initialisation des extensions
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
+csrf = CSRFProtect()
 login_manager.login_view = 'auth.login'
 login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
 login_manager.login_message_category = "warning"
 
 def create_app(config_class=None):
-    from app.config import Config
+    from config import Config
     app = Flask(__name__)
     app.config.from_object(config_class or Config)
     
@@ -21,6 +23,7 @@ def create_app(config_class=None):
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
+    csrf.init_app(app)
     
     # Assurer la création du dossier d'upload
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -35,6 +38,9 @@ def create_app(config_class=None):
     from app.routes.properties import properties as properties_blueprint
     from app.routes.transactions import transactions as transactions_blueprint
     from app.routes.settings import settings_bp
+    from app.routes.airbnb import airbnb as airbnb_blueprint
+    from app.routes.agents import agents as agents_blueprint
+    from app.routes.finance import finance as finance_blueprint
     
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(dashboard_blueprint, url_prefix='/')
@@ -43,6 +49,9 @@ def create_app(config_class=None):
     app.register_blueprint(properties_blueprint, url_prefix='/proprietes')
     app.register_blueprint(transactions_blueprint, url_prefix='/transactions')
     app.register_blueprint(settings_bp)
+    app.register_blueprint(airbnb_blueprint, url_prefix='/airbnb')
+    app.register_blueprint(agents_blueprint, url_prefix='/agents')
+    app.register_blueprint(finance_blueprint, url_prefix='/finance')
     
     # Contexte global pour les templates (rôles et utilitaires)
     @app.context_processor
@@ -74,5 +83,14 @@ def create_app(config_class=None):
             return f"{formatted} HTG"
         else:
             return f"{formatted} €"
+
+    # En-têtes HTTP de sécurité
+    @app.after_request
+    def set_security_headers(response):
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        return response
             
     return app

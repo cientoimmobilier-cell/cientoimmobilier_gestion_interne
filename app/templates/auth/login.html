@@ -33,6 +33,7 @@
         {% endwith %}
 
         <form action="{{ url_for('auth.login') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-3">
                 <label for="email" class="form-label text-dark fw-semibold" style="font-size: 0.9rem;">Adresse e-mail</label>
                 <div class="input-group">

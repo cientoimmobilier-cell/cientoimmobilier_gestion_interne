@@ -1,6 +1,6 @@
 import unittest
 from app import create_app, db
-from app.config import Config
+from config import Config
 from app.models import Utilisateur, Client, Propriete, Transaction, Commission
 from datetime import datetime, date
 

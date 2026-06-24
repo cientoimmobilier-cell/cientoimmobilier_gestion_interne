@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Reçus - Ciento Immobilier{% endblock %}
+{% block header_title %}Gestion des Reçus{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">Reçus Émis</h5>
+                <button class="btn btn-accent btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addRecuModal"><i class="fa-solid fa-receipt me-1"></i> Créer un reçu</button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>N° Reçu</th>
+                            <th>Date</th>
+                            <th>Client</th>
+                            <th>Facture liée</th>
+                            <th>Montant</th>
+                            <th>Méthode</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for recu in recus %}
+                        <tr>
+                            <td class="fw-bold">{{ recu.numero_recu }}</td>
+                            <td>{{ recu.date_emission.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ recu.client_recu.prenom if recu.client_recu else '' }} {{ recu.client_recu.nom if recu.client_recu else 'Inconnu' }}</td>
+                            <td>{{ recu.facture.numero_facture if recu.facture else '-' }}</td>
+                            <td class="fw-bold text-success">{{ recu.montant | format_price }}</td>
+                            <td>{{ recu.methode_paiement or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">Aucun reçu enregistré.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ajout Reçu -->
+<div class="modal fade" id="addRecuModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light border-0">
+                <h5 class="modal-title fw-bold text-dark">Générer un Reçu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('finance.add_recu') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Numéro de Reçu</label>
+                            <input type="text" class="form-control form-control-premium" name="numero_recu" required placeholder="REC-2026-001">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Client</label>
+                            <select class="form-select form-control-premium" name="client_id" required>
+                                <option value="">-- Sélectionner un client --</option>
+                                {% for client in clients %}
+                                <option value="{{ client.id }}">{{ client.prenom }} {{ client.nom }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Montant</label>
+                            <input type="number" step="0.01" class="form-control form-control-premium" name="montant" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Méthode de Paiement</label>
+                            <select class="form-select form-control-premium" name="methode_paiement" required>
+                                <option value="Espèces">Espèces</option>
+                                <option value="Virement">Virement</option>
+                                <option value="Chèque">Chèque</option>
+                                <option value="Carte Bancaire">Carte Bancaire</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-accent rounded-3">Générer le Reçu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

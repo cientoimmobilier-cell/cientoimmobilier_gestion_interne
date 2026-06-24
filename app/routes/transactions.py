@@ -1,9 +1,10 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, current_app, send_file
 from flask_login import login_required, current_user
 from app.models import Transaction, Client, Propriete, Utilisateur, Commission, Paiement, Contrat
-from app.utils import log_activity
+from app.utils.helpers import log_activity
 from app import db
-from app.pdf_utils import generate_transaction_sheet_pdf, generate_payment_receipt_pdf
+from app.services.pdf_service import generate_transaction_sheet_pdf, generate_payment_receipt_pdf
+from app.services.excel_service import export_transactions_to_excel
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
@@ -184,6 +185,119 @@ def delete_transaction(tx_id):
         flash(f"Erreur lors de la suppression: {e}", "danger")
         
     return redirect(url_for('transactions.list_transactions'))
+
+@transactions.route('/export')
+@login_required
+def export_transactions():
+    search = request.args.get('search', '')
+    type_tx = request.args.get('type_transaction', '')
+    statut = request.args.get('statut', '')
+    
+    query = Transaction.query
+    
+    if search:
+        query = query.filter(
+            (Transaction.reference_transaction.ilike(f'%{search}%')) |
+            (Transaction.observations.ilike(f'%{search}%'))
+        )
+    if type_tx:
+        query = query.filter_by(type_transaction=type_tx)
+    if statut:
+        query = query.filter_by(statut=statut)
+        
+    transactions_list = query.order_by(Transaction.date_transaction.desc()).all()
+    
+    output = export_transactions_to_excel(transactions_list)
+    log_activity(current_user.id, "Export des transactions", "transactions")
+    
+    return send_file(
+        output,
+        download_name=f"transactions_{datetime.utcnow().strftime('%Y%m%d')}.xlsx",
+        as_attachment=True,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+@transactions.route('/modifier/<int:tx_id>', methods=['GET', 'POST'])
+@login_required
+def edit_transaction(tx_id):
+    if current_user.role not in ['Administrateur', 'Directeur']:
+        abort(403)
+        
+    tx = Transaction.query.get_or_404(tx_id)
+    clients = Client.query.order_by(Client.nom.asc()).all()
+    # On affiche les biens disponibles OU le bien déjà associé à la transaction
+    proprietes = Propriete.query.filter((Propriete.statut == 'Disponible') | (Propriete.id == tx.propriete_id)).order_by(Propriete.reference_bien.asc()).all()
+    agents = Utilisateur.query.filter_by(actif=True).order_by(Utilisateur.nom.asc()).all()
+    
+    commission = Commission.query.filter_by(transaction_id=tx.id).first()
+    
+    if request.method == 'POST':
+        tx.client_id = request.form.get('client_id')
+        
+        nouveau_propriete_id = request.form.get('propriete_id')
+        if int(nouveau_propriete_id) != tx.propriete_id:
+            # Libérer l'ancienne propriété
+            ancienne_prop = Propriete.query.get(tx.propriete_id)
+            if ancienne_prop and ancienne_prop.statut in ['Réservé', 'Vendu', 'Loué']:
+                ancienne_prop.statut = 'Disponible'
+            
+            # Réserver la nouvelle
+            nouvelle_prop = Propriete.query.get(nouveau_propriete_id)
+            if nouvelle_prop:
+                nouvelle_prop.statut = 'Réservé'
+            
+            tx.propriete_id = nouveau_propriete_id
+
+        tx.agent_id = request.form.get('agent_id')
+        tx.type_transaction = request.form.get('type_transaction')
+        tx.montant = request.form.get('montant')
+        date_str = request.form.get('date_transaction')
+        tx.observations = request.form.get('observations')
+        tx.devise = request.form.get('devise', 'EUR')
+        
+        pourcentage_commission = request.form.get('pourcentage_commission') or 0
+        
+        try:
+            tx.date_transaction = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Format de date invalide.", "danger")
+            return redirect(url_for('transactions.edit_transaction', tx_id=tx.id))
+            
+        try:
+            # Update commission
+            pct = float(pourcentage_commission)
+            mt_commission = float(tx.montant) * (pct / 100)
+            
+            if commission:
+                commission.pourcentage = pct
+                commission.montant = mt_commission
+                commission.agent_id = tx.agent_id
+            else:
+                commission = Commission(
+                    transaction_id=tx.id,
+                    agent_id=tx.agent_id,
+                    pourcentage=pct,
+                    montant=mt_commission,
+                    date_calcul=tx.date_transaction
+                )
+                db.session.add(commission)
+                
+            db.session.commit()
+            log_activity(current_user.id, f"Modification transaction: {tx.reference_transaction}", "transactions", tx.id)
+            flash(f"La transaction {tx.reference_transaction} a été modifiée avec succès.", "success")
+            return redirect(url_for('transactions.view_transaction', tx_id=tx.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Erreur d'enregistrement: {e}", "danger")
+            
+    return render_template(
+        'transactions/form.html',
+        tx=tx,
+        commission=commission,
+        clients=clients,
+        proprietes=proprietes,
+        agents=agents
+    )
 
 # --- Ajouter un paiement ---
 @transactions.route('/paiement/ajouter/<int:tx_id>', methods=['POST'])

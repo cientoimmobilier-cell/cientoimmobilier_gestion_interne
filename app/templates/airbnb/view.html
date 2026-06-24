@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}{{ bien.titre }} - AirBNB - Ciento Immobilier{% endblock %}
+{% block header_title %}Fiche AirBNB #{{ bien.reference }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Colonne Gauche : Détails du bien -->
+    <div class="col-lg-4 col-md-12">
+        <div class="card-premium">
+            <!-- Header AirBNB -->
+            <div class="text-center mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-3" style="width: 80px; height: 80px; background: linear-gradient(135deg, #ff385c, #e31c5f);">
+                    <i class="fa-solid fa-house-chimney-window text-white fs-3"></i>
+                </div>
+                <h4 class="fw-bold text-dark mb-1">{{ bien.titre }}</h4>
+                <span class="badge bg-light text-dark font-monospace mb-2">{{ bien.reference }}</span>
+                <div>
+                    <span class="badge {% if bien.statut == 'Actif' %}bg-success{% elif bien.statut == 'En maintenance' %}bg-warning text-dark{% else %}bg-secondary{% endif %} rounded-pill px-3">{{ bien.statut }}</span>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Localisation</small>
+                <span class="text-dark"><i class="fa-solid fa-location-dot me-2" style="color: #ff385c;"></i>{{ bien.adresse or '' }} {{ bien.ville or 'N/A' }}{% if bien.quartier %}, {{ bien.quartier }}{% endif %}</span>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Type de bien</small>
+                <span class="text-dark"><i class="fa-solid fa-building me-2 text-muted"></i>{{ bien.type_bien }}</span>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-4 text-center">
+                    <div class="bg-light rounded-3 p-2">
+                        <i class="fa-solid fa-users d-block mb-1" style="color: #ff385c;"></i>
+                        <span class="fw-bold">{{ bien.capacite }}</span><br>
+                        <small class="text-muted">Pers.</small>
+                    </div>
+                </div>
+                <div class="col-4 text-center">
+                    <div class="bg-light rounded-3 p-2">
+                        <i class="fa-solid fa-bed d-block mb-1" style="color: #ff385c;"></i>
+                        <span class="fw-bold">{{ bien.nombre_chambres or '-' }}</span><br>
+                        <small class="text-muted">Ch.</small>
+                    </div>
+                </div>
+                <div class="col-4 text-center">
+                    <div class="bg-light rounded-3 p-2">
+                        <i class="fa-solid fa-bath d-block mb-1" style="color: #ff385c;"></i>
+                        <span class="fw-bold">{{ bien.nombre_salles_bain or '-' }}</span><br>
+                        <small class="text-muted">SdB</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Prix par nuit</small>
+                <span class="fw-bold fs-4" style="color: #ff385c;">{{ bien.prix_par_nuit | format_price(bien.devise) }}</span>
+                {% if bien.frais_menage and bien.frais_menage > 0 %}
+                <small class="text-muted d-block">+ {{ bien.frais_menage | format_price(bien.devise) }} frais de ménage</small>
+                {% endif %}
+            </div>
+
+            <!-- Équipements -->
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-2" style="font-size: 0.75rem;">Équipements</small>
+                <div class="d-flex flex-wrap gap-2">
+                    {% if bien.wifi %}<span class="badge bg-light text-dark border"><i class="fa-solid fa-wifi me-1"></i>Wi-Fi</span>{% endif %}
+                    {% if bien.parking %}<span class="badge bg-light text-dark border"><i class="fa-solid fa-square-parking me-1"></i>Parking</span>{% endif %}
+                    {% if bien.climatisation %}<span class="badge bg-light text-dark border"><i class="fa-solid fa-snowflake me-1"></i>Climatisation</span>{% endif %}
+                    {% if bien.piscine %}<span class="badge bg-light text-dark border"><i class="fa-solid fa-water-ladder me-1"></i>Piscine</span>{% endif %}
+                    {% if not bien.wifi and not bien.parking and not bien.climatisation and not bien.piscine %}
+                    <span class="text-muted small">Aucun équipement renseigné</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if bien.proprietaire_airbnb %}
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Propriétaire</small>
+                <span class="text-dark"><i class="fa-solid fa-user-shield me-2 text-muted"></i>{{ bien.proprietaire_airbnb.prenom }} {{ bien.proprietaire_airbnb.nom }}</span>
+            </div>
+            {% endif %}
+
+            {% if bien.agent_gestionnaire %}
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Agent gestionnaire</small>
+                <span class="text-dark"><i class="fa-solid fa-user-tie me-2 text-muted"></i>{{ bien.agent_gestionnaire.prenom }} {{ bien.agent_gestionnaire.nom }}</span>
+            </div>
+            {% endif %}
+
+            {% if bien.lien_airbnb %}
+            <div class="mb-3">
+                <a href="{{ bien.lien_airbnb }}" target="_blank" class="btn btn-sm w-100 rounded-3 text-white" style="background: #ff385c;">
+                    <i class="fa-solid fa-arrow-up-right-from-square me-2"></i>Voir sur AirBNB
+                </a>
+            </div>
+            {% endif %}
+
+            <div class="d-grid gap-2 mt-3">
+                <a href="{{ url_for('airbnb.download_airbnb_pdf', bien_id=bien.id) }}" class="btn btn-outline-secondary w-100 rounded-3" target="_blank">
+                    <i class="fa-solid fa-file-pdf me-2"></i>Générer PDF
+                </a>
+                <a href="{{ url_for('airbnb.edit_bien', bien_id=bien.id) }}" class="btn btn-premium w-100 rounded-3"><i class="fa-solid fa-pen-to-square me-2"></i>Modifier</a>
+                {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                <form action="{{ url_for('airbnb.delete_bien', bien_id=bien.id) }}" method="POST" onsubmit="return confirm('Supprimer ce bien et toutes ses réservations ?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-danger w-100 rounded-3"><i class="fa-solid fa-trash-can me-2"></i>Supprimer</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Colonne Droite : Stats + Réservations -->
+    <div class="col-lg-8 col-md-12">
+        <!-- Statistiques -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-6">
+                <div class="card-premium text-center py-3">
+                    <div class="fw-bold fs-4" style="color: #ff385c;">{{ total_reservations }}</div>
+                    <small class="text-muted">Réservations</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card-premium text-center py-3">
+                    <div class="fw-bold fs-4 text-success">{{ reservations_confirmees }}</div>
+                    <small class="text-muted">Confirmées</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card-premium text-center py-3">
+                    <div class="fw-bold fs-4 text-primary">{{ nuits_total }}</div>
+                    <small class="text-muted">Nuits total</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card-premium text-center py-3">
+                    <div class="fw-bold fs-5 text-warning">{{ "%.2f"|format(revenus_total) }} €</div>
+                    <small class="text-muted">Revenus nets</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Réservations -->
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-calendar-days me-2" style="color: #ff385c;"></i>Réservations</h5>
+                <button type="button" class="btn btn-sm rounded-3 text-white" style="background: #ff385c;" data-bs-toggle="modal" data-bs-target="#addReservationModal">
+                    <i class="fa-solid fa-plus me-1"></i>Nouvelle réservation
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Voyageur</th>
+                            <th>Arrivée</th>
+                            <th>Départ</th>
+                            <th>Nuits</th>
+                            <th>Montant</th>
+                            <th>Net</th>
+                            <th>Statut</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for res in bien.reservations|sort(attribute='date_arrivee', reverse=True) %}
+                        <tr>
+                            <td>
+                                <span class="fw-semibold text-dark">{{ res.nom_voyageur }}</span>
+                                {% if res.nombre_voyageurs > 1 %}<small class="text-muted"> ({{ res.nombre_voyageurs }} pers.)</small>{% endif %}
+                            </td>
+                            <td>{{ res.date_arrivee.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ res.date_depart.strftime('%d/%m/%Y') }}</td>
+                            <td><span class="badge bg-light text-dark">{{ res.nombre_nuits }}N</span></td>
+                            <td class="fw-bold">{{ res.montant_total | format_price(res.devise) }}</td>
+                            <td class="fw-semibold text-success">{{ res.montant_net | format_price(res.devise) }}</td>
+                            <td>
+                                <span class="badge bg-opacity-10 
+                                    {% if res.statut == 'Confirmée' %}bg-success text-success
+                                    {% elif res.statut == 'En attente' %}bg-warning text-warning
+                                    {% elif res.statut == 'Terminée' %}bg-primary text-primary
+                                    {% else %}bg-danger text-danger{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    {{ res.statut }}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <form action="{{ url_for('airbnb.delete_reservation', reservation_id=res.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Supprimer cette réservation ?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle"><i class="fa-solid fa-times"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">Aucune réservation enregistrée pour ce bien.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if bien.observations %}
+        <div class="card-premium mt-4">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-clipboard me-2" style="color: #ff385c;"></i>Notes internes</h5>
+            <div class="bg-light p-3 rounded-3" style="white-space: pre-line;">{{ bien.observations }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Nouvelle Réservation -->
+<div class="modal fade" id="addReservationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content rounded-3 shadow border-0">
+            <div class="modal-header border-bottom-0 bg-light rounded-top-3">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-calendar-plus me-2" style="color: #ff385c;"></i>Nouvelle réservation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('airbnb.add_reservation', bien_id=bien.id) }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Nom du voyageur</label>
+                            <input type="text" class="form-control form-control-premium" name="nom_voyageur" required placeholder="Jean Dupont">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-semibold">Téléphone</label>
+                            <input type="text" class="form-control form-control-premium" name="telephone_voyageur" placeholder="+33...">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-semibold">Voyageurs</label>
+                            <input type="number" class="form-control form-control-premium" name="nombre_voyageurs" min="1" value="1">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Email du voyageur</label>
+                        <input type="email" class="form-control form-control-premium" name="email_voyageur" placeholder="voyageur@email.com">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Date d'arrivée</label>
+                            <input type="date" class="form-control form-control-premium" name="date_arrivee" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Date de départ</label>
+                            <input type="date" class="form-control form-control-premium" name="date_depart" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Statut</label>
+                            <select class="form-select form-control-premium" name="statut">
+                                <option value="Confirmée">Confirmée</option>
+                                <option value="En attente">En attente</option>
+                                <option value="Terminée">Terminée</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Montant total</label>
+                            <input type="number" step="0.01" class="form-control form-control-premium" name="montant_total" required placeholder="850.00">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Commission AirBNB</label>
+                            <input type="number" step="0.01" class="form-control form-control-premium" name="commission_airbnb" placeholder="50.00" value="0">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">Devise</label>
+                            <select class="form-select form-control-premium" name="devise">
+                                <option value="{{ bien.devise }}">{{ bien.devise }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Observations</label>
+                        <textarea class="form-control form-control-premium" name="observations" rows="2" placeholder="Notes..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 p-3 bg-light rounded-bottom-3 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Fermer</button>
+                    <button type="submit" class="btn rounded-3 text-white" style="background: #ff385c;">Enregistrer la réservation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

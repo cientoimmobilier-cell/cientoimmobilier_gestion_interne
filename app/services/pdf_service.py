@@ -95,8 +95,9 @@ def generate_transaction_sheet_pdf(transaction):
     else:
         logo_cell = Paragraph("<b>CIENTO IMMOBILIER</b>", bold_style)
         
-    info_text = f"""<b>CIENTO IMMOBILIER SA</b><br/>
-    Gestion Immobilière & Transactions<br/>
+    info_text = f"""<b>CIENTO IMMOBILIER</b><br/>
+    <i>La Solution en Service Immobilier</i><br/>
+    Entreprise Immobilière<br/>
     Date : {datetime.now().strftime('%d/%m/%Y à %H:%M')}<br/>
     Réf : {transaction.reference_transaction}
     """
@@ -280,10 +281,11 @@ def generate_payment_receipt_pdf(payment):
     else:
         logo_cell = Paragraph("<b>CIENTO IMMOBILIER</b>", bold_style)
         
-    info_text = f"""<b>CIENTO IMMOBILIER SA</b><br/>
-    Bureau de transaction local<br/>
-    Téléphone : +33 1 00 00 00 00<br/>
-    E-mail : contact@ciento.immo
+    info_text = f"""<b>CIENTO IMMOBILIER</b><br/>
+    <i>La Solution en Service Immobilier</i><br/>
+    Entreprise Immobilière<br/>
+    Date : {datetime.now().strftime('%d/%m/%Y à %H:%M')}<br/>
+    Réf Paiement : {payment.reference_paiement or f"PAY-{payment.id:05d}"}
     """
     
     header_data.append([logo_cell, Paragraph(info_text, normal_style)])
@@ -361,6 +363,161 @@ def generate_payment_receipt_pdf(payment):
     
     # Footer
     story.append(Paragraph("Ce reçu de versement est délivré à titre de preuve et ne remplace pas l'acte authentique de vente.", footer_style))
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+def generate_airbnb_sheet_pdf(bien):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, 
+        pagesize=letter, 
+        rightMargin=40, 
+        leftMargin=40, 
+        topMargin=40, 
+        bottomMargin=40
+    )
+    story = []
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        leading=24,
+        textColor=colors.HexColor('#ff385c'),  # Airbnb Red
+        spaceAfter=15
+    )
+    
+    section_style = ParagraphStyle(
+        'DocSection',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        leading=16,
+        textColor=colors.HexColor('#ff385c'),
+        spaceBefore=15,
+        spaceAfter=8
+    )
+    
+    normal_style = ParagraphStyle(
+        'DocNormal',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=14,
+        textColor=colors.HexColor('#334155')
+    )
+    
+    bold_style = ParagraphStyle(
+        'DocBold',
+        parent=normal_style,
+        fontName='Helvetica-Bold'
+    )
+    
+    footer_style = ParagraphStyle(
+        'DocFooter',
+        parent=styles['Italic'],
+        fontName='Helvetica-Oblique',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#64748b'),
+        alignment=1
+    )
+
+    # Header with Logo
+    logo_path = os.path.join(current_app.root_path, 'static', 'logo.jpg')
+    header_data = []
+    
+    if os.path.exists(logo_path):
+        img = Image(logo_path, width=80, height=50)
+        img.hAlign = 'LEFT'
+        logo_cell = img
+    else:
+        logo_cell = Paragraph("<b>CIENTO IMMOBILIER</b>", bold_style)
+        
+    info_text = f"""<b>CIENTO IMMOBILIER</b><br/>
+    <i>La Solution en Service Immobilier</i><br/>
+    Entreprise Immobilière — Service Gestion AirBNB<br/>
+    Date : {datetime.now().strftime('%d/%m/%Y à %H:%M')}<br/>
+    Réf : {bien.reference}
+    """
+    
+    header_data.append([logo_cell, Paragraph(info_text, normal_style)])
+    
+    header_table = Table(header_data, colWidths=[150, 380])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    story.append(header_table)
+    
+    # Horizontal line
+    line_table = Table([[""]], colWidths=[530], rowHeights=[2])
+    line_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#ff385c')),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(line_table)
+    story.append(Spacer(1, 15))
+    
+    # Document Title
+    story.append(Paragraph(f"FICHE DE BIEN AIRBNB", title_style))
+    story.append(Paragraph(f"Cette fiche récapitule les détails du bien <b>{bien.titre}</b>.", normal_style))
+    story.append(Spacer(1, 10))
+    
+    # General Info Table
+    story.append(Paragraph("1. Informations générales", section_style))
+    
+    summary_data = [
+        [Paragraph("Référence :", bold_style), Paragraph(bien.reference, normal_style)],
+        [Paragraph("Type de bien :", bold_style), Paragraph(bien.type_bien, normal_style)],
+        [Paragraph("Adresse :", bold_style), Paragraph(f"{bien.adresse}, {bien.ville}", normal_style)],
+        [Paragraph("Capacité :", bold_style), Paragraph(f"{bien.capacite} voyageurs", normal_style)],
+        [Paragraph("Prix par nuit :", bold_style), Paragraph(format_currency_pdf(bien.prix_par_nuit, bien.devise), bold_style)],
+        [Paragraph("Statut actuel :", bold_style), Paragraph(bien.statut, normal_style)]
+    ]
+    
+    summary_table = Table(summary_data, colWidths=[180, 350])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('PADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 10))
+    
+    # Parties Table
+    story.append(Paragraph("2. Gestion", section_style))
+    
+    owner_name = f"{bien.proprietaire_airbnb.prenom} {bien.proprietaire_airbnb.nom}" if bien.proprietaire_airbnb else "N/A"
+    owner_contact = f"Tél: {bien.proprietaire_airbnb.telephone or 'N/A'}" if bien.proprietaire_airbnb else ""
+    
+    agent_name = f"{bien.agent_gestionnaire.prenom} {bien.agent_gestionnaire.nom}" if bien.agent_gestionnaire else "N/A"
+    
+    parties_data = [
+        [Paragraph("Propriétaire :", bold_style), Paragraph(f"<b>{owner_name}</b><br/>{owner_contact}", normal_style)],
+        [Paragraph("Agent Gestionnaire :", bold_style), Paragraph(f"<b>{agent_name}</b>", normal_style)]
+    ]
+    
+    parties_table = Table(parties_data, colWidths=[180, 350])
+    parties_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('PADDING', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    story.append(parties_table)
+    story.append(Spacer(1, 40))
+    
+    # Footer
+    story.append(Paragraph("Ciento Immobilier — Document généré automatiquement en local.", footer_style))
     
     doc.build(story)
     buffer.seek(0)

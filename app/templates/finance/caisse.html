@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion de la Caisse - Ciento Immobilier{% endblock %}
+{% block header_title %}Gestion de la Caisse{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">Mouvements de Caisse Récents</h5>
+                <button class="btn btn-accent btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addCaisseModal"><i class="fa-solid fa-plus me-1"></i> Nouvelle Caisse</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Montant</th>
+                            <th>Caisse</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mvt in mouvements %}
+                        <tr>
+                            <td>{{ mvt.date_mouvement.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                <span class="badge {% if mvt.type_mouvement == 'Recette' %}bg-success{% else %}bg-danger{% endif %} rounded-pill px-2 py-1">
+                                    {{ mvt.type_mouvement }}
+                                </span>
+                            </td>
+                            <td class="fw-bold {% if mvt.type_mouvement == 'Recette' %}text-success{% else %}text-danger{% endif %}">
+                                {{ mvt.montant | format_price }}
+                            </td>
+                            <td>{{ mvt.caisse.nom if mvt.caisse else '-' }}</td>
+                            <td>{{ mvt.description or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Aucun mouvement de caisse enregistré.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ajout Caisse -->
+<div class="modal fade" id="addCaisseModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light border-0">
+                <h5 class="modal-title fw-bold text-dark">Créer une Nouvelle Caisse</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('finance.add_caisse') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Nom de la Caisse</label>
+                        <input type="text" class="form-control form-control-premium" name="nom" required placeholder="Caisse Principale">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Solde Initial</label>
+                            <input type="number" step="0.01" class="form-control form-control-premium" name="solde" value="0" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Devise</label>
+                            <select class="form-select form-control-premium" name="devise" required>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="HTG">HTG</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-accent rounded-3">Créer la Caisse</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

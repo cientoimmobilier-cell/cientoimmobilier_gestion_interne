@@ -52,6 +52,18 @@
             </div>
 
             <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Zone ciblée</small>
+                <span class="text-dark"><i class="fa-solid fa-map-location-dot me-2 text-warning"></i>{{ client.zone_ciblee or 'Non renseignée' }}</span>
+            </div>
+
+            {% if client.description %}
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Description</small>
+                <div class="bg-light p-2 rounded-3 small text-dark" style="white-space: pre-line;">{{ client.description }}</div>
+            </div>
+            {% endif %}
+
+            <div class="mb-3">
                 <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Budget Indicatif</small>
                 <span class="text-dark fw-bold text-accent">
                     <i class="fa-solid fa-wallet me-2 text-muted"></i>
@@ -99,9 +111,10 @@
                             <th>Opération</th>
                             <th>Type de bien</th>
                             <th>Zone géographique</th>
-                            <th>Chambres/Salles de bain</th>
+                            <th>Chambres/SdB</th>
                             <th>Budget Max</th>
                             <th>Statut</th>
+                            <th>État</th>
                             <th class="text-end">Action</th>
                         </tr>
                     </thead>
@@ -109,7 +122,7 @@
                         {% for demande in client.demandes %}
                         <tr>
                             <td>
-                                <span class="badge {% if demande.type_operation == 'Achat' or demande.type_operation == 'Vente' %}bg-primary{% else %}bg-info{% endif %} rounded-pill">
+                                <span class="badge {% if demande.type_operation == 'Achat' %}bg-primary{% elif demande.type_operation == 'Vente' %}bg-success{% elif demande.type_operation == 'Location' %}bg-info{% elif demande.type_operation == 'Gestion' %}bg-secondary{% else %}bg-dark{% endif %} rounded-pill">
                                     {{ demande.type_operation }}
                                 </span>
                             </td>
@@ -122,21 +135,36 @@
                             <td class="fw-bold">{% if demande.budget %}{{ demande.budget | format_price(demande.devise) }}{% else %}N/A{% endif %}</td>
                             <td>
                                 <span class="badge bg-opacity-10 
-                                    {% if demande.statut == 'En cours' %}bg-warning text-warning
-                                    {% elif demande.statut == 'Satisfaite' %}bg-success text-success
-                                    {% else %}bg-danger text-danger{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    {% if demande.statut == 'Recherche' %}bg-warning text-warning
+                                    {% elif demande.statut == 'Trouvé' %}bg-info text-info
+                                    {% elif demande.statut == 'En négociation' %}bg-primary text-primary
+                                    {% elif demande.statut == 'Suspension' %}bg-secondary text-secondary
+                                    {% elif demande.statut == 'Conclue' %}bg-success text-success
+                                    {% else %}bg-dark text-dark{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
                                     {{ demande.statut }}
                                 </span>
                             </td>
+                            <td>
+                                {% if demande.etat_demande == 'Urgence' %}
+                                <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    <i class="fa-solid fa-bolt me-1"></i>Urgence
+                                </span>
+                                {% else %}
+                                <span class="badge bg-light text-muted rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    Pas urgence
+                                </span>
+                                {% endif %}
+                            </td>
                             <td class="text-end">
                                 <form action="{{ url_for('clients.delete_demande', demande_id=demande.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Retirer ce critère de recherche ?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle"><i class="fa-solid fa-times"></i></button>
                                 </form>
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted">Aucun critère de recherche actif. Cliquez sur "Nouveau critère" pour en ajouter.</td>
+                            <td colspan="8" class="text-center text-muted">Aucun critère de recherche actif. Cliquez sur "Nouveau critère" pour en ajouter.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -196,34 +224,41 @@
 
 <!-- Modal Ajout Critère -->
 <div class="modal fade" id="addDemandeModal" tabindex="-1" aria-labelledby="addDemandeModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content rounded-3 shadow border-0">
             <div class="modal-header border-bottom-0 bg-light rounded-top-3">
                 <h5 class="modal-title fw-bold" id="addDemandeModalLabel"><i class="fa-solid fa-magnifying-glass text-warning me-2"></i>Nouveau critère de recherche</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="{{ url_for('clients.add_demande', client_id=client.id) }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body p-4">
-                    <div class="mb-3">
-                        <label for="type_operation" class="form-label fw-semibold">Type d'opération</label>
-                        <select class="form-select form-control-premium" id="type_operation" name="type_operation" required>
-                            <option value="Achat">Achat / Vente</option>
-                            <option value="Location">Location</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="type_bien" class="form-label fw-semibold">Type de bien</label>
-                        <select class="form-select form-control-premium" id="type_bien" name="type_bien" required>
-                            <option value="Maison">Maison</option>
-                            <option value="Appartement">Appartement</option>
-                            <option value="Terrain">Terrain</option>
-                            <option value="Villa">Villa</option>
-                            <option value="Bureau">Bureau</option>
-                            <option value="Local commercial">Local commercial</option>
-                            <option value="Entrepôt">Entrepôt</option>
-                            <option value="Immeuble">Immeuble</option>
-                        </select>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="type_operation" class="form-label fw-semibold">Type de demande</label>
+                            <select class="form-select form-control-premium" id="type_operation" name="type_operation" required>
+                                <option value="Location">Location</option>
+                                <option value="Achat">Achat</option>
+                                <option value="Vente">Vente</option>
+                                <option value="Gestion">Gestion</option>
+                                <option value="Autre">Autre (Préciser)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="type_bien" class="form-label fw-semibold">Type de bien</label>
+                            <select class="form-select form-control-premium" id="type_bien" name="type_bien" required>
+                                <option value="Maison">Maison</option>
+                                <option value="Appartement">Appartement</option>
+                                <option value="Studio">Studio</option>
+                                <option value="Terrain">Terrain</option>
+                                <option value="Villa">Villa</option>
+                                <option value="Bureau">Bureau</option>
+                                <option value="Local commercial">Local commercial</option>
+                                <option value="Entrepôt">Entrepôt</option>
+                                <option value="Immeuble">Immeuble</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -232,13 +267,20 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="chambres" class="form-label fw-semibold">Chambres min.</label>
                             <input type="number" class="form-control form-control-premium" id="chambres" name="chambres" min="0" placeholder="2">
                         </div>
-                        <div class="col-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="salles_bain" class="form-label fw-semibold">SdB min.</label>
                             <input type="number" class="form-control form-control-premium" id="salles_bain" name="salles_bain" min="0" placeholder="1">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="etat_demande" class="form-label fw-semibold">État de la demande</label>
+                            <select class="form-select form-control-premium" id="etat_demande" name="etat_demande" required>
+                                <option value="Pas urgence">Pas urgence</option>
+                                <option value="Urgence">Urgence</option>
+                            </select>
                         </div>
                     </div>
 
@@ -258,7 +300,7 @@
                     </div>
                 </div>
                 <div class="modal-footer border-top-0 p-3 bg-light rounded-bottom-3 d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-toggle="modal">Fermer</button>
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Fermer</button>
                     <button type="submit" class="btn btn-accent rounded-3">Enregistrer</button>
                 </div>
             </form>

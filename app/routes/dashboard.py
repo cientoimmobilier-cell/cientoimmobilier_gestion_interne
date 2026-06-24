@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, abort
 from flask_login import login_required, current_user
-from app.models import Propriete, Client, Transaction, JournalActivite, Visite
+from app.models import Propriete, Client, Transaction, JournalActivite, Visite, BienAirbnb, ReservationAirbnb, Utilisateur
 from datetime import datetime, date
 from sqlalchemy import extract, func
 from app import db
@@ -48,6 +48,15 @@ def index():
     type_labels = [p[0] for p in properties_by_type]
     type_counts = [p[1] for p in properties_by_type]
 
+    # Nouvelles statistiques (AirBNB et Agents)
+    total_airbnb = BienAirbnb.query.count()
+    agents_actifs = Utilisateur.query.filter_by(role='Agent immobilier', actif=True).count()
+    reservations_airbnb_mois = ReservationAirbnb.query.filter(
+        ReservationAirbnb.statut.in_(['Confirmée', 'Terminée']),
+        extract('year', ReservationAirbnb.date_arrivee) == current_year,
+        extract('month', ReservationAirbnb.date_arrivee) == current_month
+    ).count()
+
     return render_template(
         'dashboard/index.html',
         total_properties=total_properties,
@@ -58,7 +67,10 @@ def index():
         recent_transactions=recent_transactions,
         recent_visits=recent_visits,
         type_labels=type_labels,
-        type_counts=type_counts
+        type_counts=type_counts,
+        total_airbnb=total_airbnb,
+        agents_actifs=agents_actifs,
+        reservations_airbnb_mois=reservations_airbnb_mois
     )
 
 @dashboard.route('/activities')

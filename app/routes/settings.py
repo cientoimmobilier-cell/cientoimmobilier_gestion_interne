@@ -1,22 +1,22 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import login_required, current_user
 from app.models import Utilisateur
-from app.utils import log_activity, role_required
+from app.utils.helpers import log_activity, role_required
 from app import db
 import string
-import random
+import secrets
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 
 def generate_random_password(length=12):
     characters = string.ascii_letters + string.digits + "!@#$%^&*"
-    return ''.join(random.choice(characters) for i in range(length))
+    return ''.join(secrets.choice(characters) for i in range(length))
 
 @settings_bp.route('/users')
 @login_required
 @role_required('Administrateur', 'Directeur')
 def list_users():
-    users = Utilisateur.query.all()
+    users = Utilisateur.query.filter(Utilisateur.role != 'Agent immobilier').all()
     return render_template('settings/users_list.html', users=users)
 
 @settings_bp.route('/users/add', methods=['GET', 'POST'])
@@ -99,4 +99,27 @@ def delete_user(id):
     
     log_activity(current_user.id, 'Suppression', 'utilisateurs', id)
     flash('Utilisateur supprimé avec succès.', 'success')
+    return redirect(url_for('settings.list_users'))
+
+@settings_bp.route('/users/reset-password/<int:id>', methods=['POST'])
+@login_required
+@role_required('Administrateur', 'Directeur')
+def reset_user_password(id):
+    """Réinitialiser le mot de passe d'un utilisateur."""
+    if current_user.id == id:
+        flash("Utilisez la page 'Changer le mot de passe' pour modifier votre propre mot de passe.", "info")
+        return redirect(url_for('settings.list_users'))
+    
+    user = Utilisateur.query.get_or_404(id)
+    new_password = generate_random_password()
+    user.set_password(new_password)
+    
+    try:
+        db.session.commit()
+        log_activity(current_user.id, f"Réinitialisation mot de passe de {user.prenom} {user.nom}", "utilisateurs", user.id)
+        flash(f"Mot de passe de {user.prenom} {user.nom} réinitialisé : {new_password} (À transmettre de manière sécurisée)", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erreur : {e}", "danger")
+    
     return redirect(url_for('settings.list_users'))

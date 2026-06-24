@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Agent {{ agent.prenom }} {{ agent.nom }} - Ciento Immobilier{% endblock %}
+{% block header_title %}Fiche Agent{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Colonne Gauche : Profil Agent -->
+    <div class="col-lg-4 col-md-12">
+        <div class="card-premium">
+            <div class="text-center mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold mb-3" style="width: 80px; height: 80px; background: linear-gradient(135deg, #0f172a, #1e293b); color: #d97706; font-size: 1.8rem;">
+                    {{ agent.prenom[0]|upper }}{{ agent.nom[0]|upper }}
+                </div>
+                <h4 class="fw-bold text-dark mb-1">{{ agent.prenom }} {{ agent.nom }}</h4>
+                <span class="badge bg-secondary rounded-pill mb-2">Agent immobilier</span>
+                <div>
+                    {% if agent.actif %}
+                    <span class="badge bg-success rounded-pill px-3">Actif</span>
+                    {% else %}
+                    <span class="badge bg-danger rounded-pill px-3">Inactif</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            <!-- Zone d'affectation -->
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Zone d'affectation</small>
+                {% if agent.zone_affectation %}
+                <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3 py-2" style="font-size: 0.9rem;">
+                    <i class="fa-solid fa-map-location-dot me-1"></i>{{ agent.zone_affectation }}
+                </span>
+                {% else %}
+                <span class="text-muted"><i class="fa-solid fa-map me-2"></i>Aucune zone affectée</span>
+                {% endif %}
+            </div>
+
+            <!-- Modifier zone -->
+            {% if current_user.role in ['Administrateur', 'Directeur'] %}
+            <form action="{{ url_for('agents.affecter_zone', agent_id=agent.id) }}" method="POST" class="mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="input-group">
+                    <input type="text" class="form-control form-control-premium" name="zone_affectation" placeholder="Ex: Paris Centre, Rive Gauche..." value="{{ agent.zone_affectation or '' }}">
+                    <button type="submit" class="btn btn-accent rounded-end-3"><i class="fa-solid fa-map-pin"></i></button>
+                </div>
+                <small class="text-muted">Modifier la zone d'affectation</small>
+            </form>
+            {% endif %}
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Téléphone</small>
+                <span class="text-dark"><i class="fa-solid fa-phone me-2 text-warning"></i>{{ agent.telephone or 'Non renseigné' }}</span>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Email</small>
+                <span class="text-dark"><i class="fa-solid fa-envelope me-2 text-warning"></i><a href="mailto:{{ agent.email }}" class="text-decoration-none text-dark">{{ agent.email }}</a></span>
+            </div>
+
+            <div class="mb-3">
+                <small class="text-muted text-uppercase d-block fw-semibold mb-1" style="font-size: 0.75rem;">Date d'inscription</small>
+                <span class="text-muted"><i class="fa-solid fa-calendar me-2"></i>{{ agent.date_creation.strftime('%d/%m/%Y') }}</span>
+            </div>
+
+            {% if current_user.role in ['Administrateur', 'Directeur'] %}
+            <div class="d-grid gap-2 mt-3">
+                <a href="{{ url_for('settings.edit_user', id=agent.id) }}" class="btn btn-premium w-100 rounded-3"><i class="fa-solid fa-user-pen me-2"></i>Modifier le profil</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Colonne Droite : Performance -->
+    <div class="col-lg-8 col-md-12">
+        <!-- Statistiques de performance -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-6">
+                <div class="card-premium text-center py-3" style="border-left: 4px solid #3b82f6;">
+                    <div class="fw-bold fs-4 text-primary">{{ total_transactions }}</div>
+                    <small class="text-muted">Transactions</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card-premium text-center py-3" style="border-left: 4px solid #10b981;">
+                    <div class="fw-bold fs-4 text-success">{{ transactions_finalisees }}</div>
+                    <small class="text-muted">Finalisées</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card-premium text-center py-3" style="border-left: 4px solid #8b5cf6;">
+                    <div class="fw-bold fs-4" style="color: #8b5cf6;">{{ total_visites }}</div>
+                    <small class="text-muted">Visites</small>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card-premium text-center py-3" style="border-left: 4px solid #d97706;">
+                    <div class="fw-bold fs-5 text-warning">{{ "%.2f"|format(total_commissions) }} €</div>
+                    <small class="text-muted">Commissions</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Biens AirBNB gérés -->
+        {% if biens_airbnb %}
+        <div class="card-premium mb-4">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-house-chimney-window me-2" style="color: #ff385c;"></i>Biens AirBNB gérés</h5>
+            <div class="row">
+                {% for bien in biens_airbnb %}
+                <div class="col-md-6 mb-3">
+                    <div class="border rounded-3 p-3 bg-light d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted font-monospace small">{{ bien.reference }}</span>
+                            <h6 class="fw-bold text-dark mb-0 text-truncate">{{ bien.titre }}</h6>
+                            <small class="text-muted"><i class="fa-solid fa-location-dot me-1"></i>{{ bien.ville or 'N/A' }}</small>
+                        </div>
+                        <a href="{{ url_for('airbnb.view_bien', bien_id=bien.id) }}" class="btn btn-sm rounded-3 text-white" style="background: #ff385c;">Fiche</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Dernières Transactions -->
+        <div class="card-premium mb-4">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-file-invoice-dollar text-warning me-2"></i>Dernières transactions</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Référence</th>
+                            <th>Type</th>
+                            <th>Client</th>
+                            <th>Montant</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in dernieres_transactions %}
+                        <tr>
+                            <td><span class="fw-semibold text-dark">{{ tx.reference_transaction }}</span></td>
+                            <td><span class="badge {% if tx.type_transaction == 'Vente' %}bg-primary{% else %}bg-info{% endif %} rounded-pill">{{ tx.type_transaction }}</span></td>
+                            <td>{% if tx.client %}{{ tx.client.prenom }} {{ tx.client.nom }}{% else %}N/A{% endif %}</td>
+                            <td class="fw-bold">{{ tx.montant | format_price(tx.devise) }}</td>
+                            <td>
+                                <span class="badge bg-opacity-10 
+                                    {% if tx.statut == 'Finalisée' %}bg-success text-success
+                                    {% elif tx.statut == 'En cours' %}bg-warning text-warning
+                                    {% else %}bg-danger text-danger{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    {{ tx.statut }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center text-muted">Aucune transaction enregistrée.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Dernières Visites -->
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-calendar-days text-warning me-2"></i>Dernières visites</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Bien</th>
+                            <th>Client</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in dernieres_visites %}
+                        <tr>
+                            <td>{{ v.date_visite.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td><span class="fw-semibold text-dark">{{ v.propriete.reference_bien }}</span></td>
+                            <td>{{ v.client.prenom }} {{ v.client.nom }}</td>
+                            <td>
+                                <span class="badge bg-opacity-10 
+                                    {% if v.statut == 'Effectuée' %}bg-success text-success
+                                    {% elif v.statut == 'Planifiée' %}bg-warning text-warning
+                                    {% else %}bg-danger text-danger{% endif %} rounded-pill px-2 py-1" style="font-size: 0.75rem;">
+                                    {{ v.statut }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center text-muted">Aucune visite enregistrée.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

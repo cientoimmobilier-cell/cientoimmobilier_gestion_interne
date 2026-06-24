@@ -76,6 +76,7 @@
             
             <!-- Formulaire d'upload d'images -->
             <form action="{{ url_for('properties.upload_photos', property_id=property.id) }}" method="POST" enctype="multipart/form-data" class="mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <label class="form-label text-muted small fw-semibold">Ajouter des photos du bien</label>
                     <input class="form-control form-control-premium" type="file" name="photos" id="photo-input" multiple accept="image/*">
@@ -94,6 +95,7 @@
                         <div class="position-absolute bottom-0 start-0 w-100 bg-dark bg-opacity-70 d-flex justify-content-between p-1">
                             <!-- Définir principale -->
                             <form action="{{ url_for('properties.set_main_photo', photo_id=photo.id) }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm text-warning p-0 border-0" title="Photo principale">
                                     <i class="fa-star {% if photo.photo_principale %}fa-solid{% else %}fa-regular{% endif %}"></i>
                                 </button>
@@ -101,6 +103,7 @@
                             
                             <!-- Supprimer -->
                             <form action="{{ url_for('properties.delete_photo', photo_id=photo.id) }}" method="POST" onsubmit="return confirm('Supprimer cette photo ?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm text-danger p-0 border-0" title="Supprimer la photo">
                                     <i class="fa-solid fa-trash-can"></i>
                                 </button>
@@ -170,6 +173,7 @@
             <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-folder-open text-warning me-2"></i>Documents & Fichiers associés</h5>
             
             <form action="{{ url_for('properties.upload_document', property_id=property.id) }}" method="POST" enctype="multipart/form-data" class="mb-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row g-2">
                     <div class="col-8">
                         <input class="form-control form-control-premium" type="file" name="document" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" required>
@@ -193,6 +197,7 @@
                         <small class="text-muted d-block" style="font-size: 0.7rem;">Ajouté le {{ doc.date_upload.strftime('%d/%m/%Y') }}</small>
                     </div>
                     <form action="{{ url_for('properties.delete_document', doc_id=doc.id) }}" method="POST" onsubmit="return confirm('Retirer ce document ?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle"><i class="fa-solid fa-trash-can"></i></button>
                     </form>
                 </div>
@@ -249,6 +254,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="{{ url_for('properties.add_visit', property_id=property.id) }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label for="client_id" class="form-label fw-semibold">Client visiteur</label>

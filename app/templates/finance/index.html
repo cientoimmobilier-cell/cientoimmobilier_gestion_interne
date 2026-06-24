@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion Financière - Ciento Immobilier{% endblock %}
+{% block header_title %}Tableau de Bord Financier{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Stat 1 -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card-premium card-stat">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Solde Total Banque</div>
+                    <div class="stat-value text-primary">{{ total_banque | format_price }}</div>
+                </div>
+                <div class="text-primary fs-1"><i class="fa-solid fa-building-columns"></i></div>
+            </div>
+        </div>
+    </div>
+    <!-- Stat 2 -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card-premium card-stat" style="border-left-color: #10b981;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Solde Total Caisse</div>
+                    <div class="stat-value text-success">{{ total_caisse | format_price }}</div>
+                </div>
+                <div class="text-success fs-1"><i class="fa-solid fa-cash-register"></i></div>
+            </div>
+        </div>
+    </div>
+    <!-- Stat 3 -->
+    <div class="col-xl-3 col-md-6 mt-3 mt-xl-0">
+        <div class="card-premium card-stat">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Aujourd'hui</div>
+                    <div class="small fw-bold text-success">+ {{ recettes_jour | format_price }}</div>
+                    <div class="small fw-bold text-danger">- {{ depenses_jour | format_price }}</div>
+                </div>
+                <div class="text-secondary fs-1"><i class="fa-solid fa-calendar-day"></i></div>
+            </div>
+        </div>
+    </div>
+    <!-- Stat 4 -->
+    <div class="col-xl-3 col-md-6 mt-3 mt-xl-0">
+        <div class="card-premium card-stat">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-title">Ce Mois-ci</div>
+                    <div class="small fw-bold text-success">+ {{ recettes_mois | format_price }}</div>
+                    <div class="small fw-bold text-danger">- {{ depenses_mois | format_price }}</div>
+                </div>
+                <div class="text-secondary fs-1"><i class="fa-solid fa-calendar-days"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4">Comptes Bancaires Actifs</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Banque</th>
+                            <th>N° Compte</th>
+                            <th>Titulaire</th>
+                            <th>Solde</th>
+                            <th>Devise</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for compte in comptes %}
+                        <tr>
+                            <td class="fw-bold">{{ compte.nom_banque }}</td>
+                            <td>{{ compte.numero_compte }}</td>
+                            <td>{{ compte.titulaire }}</td>
+                            <td class="fw-bold text-primary">{{ compte.solde | format_price }}</td>
+                            <td>{{ compte.devise }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Aucun compte bancaire enregistré.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4">Caisses Actives</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Nom de la caisse</th>
+                            <th>Responsable</th>
+                            <th>Solde</th>
+                            <th>Devise</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for caisse in caisses %}
+                        <tr>
+                            <td class="fw-bold">{{ caisse.nom }}</td>
+                            <td>{{ caisse.responsable.prenom if caisse.responsable else '' }} {{ caisse.responsable.nom if caisse.responsable else 'Non assigné' }}</td>
+                            <td class="fw-bold text-success">{{ caisse.solde | format_price }}</td>
+                            <td>{{ caisse.devise }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">Aucune caisse enregistrée.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

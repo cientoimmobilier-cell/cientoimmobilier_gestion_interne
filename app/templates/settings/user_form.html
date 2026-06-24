@@ -10,6 +10,7 @@
             <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-user-plus text-warning me-2"></i>Informations du compte</h5>
             
             <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="prenom" class="form-label fw-semibold">Prénom</label>
@@ -36,17 +37,11 @@
                     <div class="col-md-6 mb-3">
                         <label for="role" class="form-label fw-semibold">Rôle attribué</label>
                         <select class="form-select form-control-premium" id="role" name="role" required>
-                            <option value="Agent immobilier" {% if action == 'edit' and user.role == 'Agent immobilier' %}selected{% endif %}>Agent immobilier</option>
                             <option value="Secrétaire" {% if action == 'edit' and user.role == 'Secrétaire' %}selected{% endif %}>Secrétaire</option>
                             <option value="Comptable" {% if action == 'edit' and user.role == 'Comptable' %}selected{% endif %}>Comptable</option>
                             <option value="Administrateur" {% if action == 'edit' and user.role == 'Administrateur' %}selected{% endif %}>Administrateur</option>
                             <option value="Directeur" {% if action == 'edit' and user.role == 'Directeur' %}selected{% endif %}>Directeur</option>
                         </select>
-                    </div>
-                    <div class="col-md-6 mb-3" id="zone_affectation_container">
-                        <label for="zone_affectation" class="form-label fw-semibold">Zone d'affectation</label>
-                        <input type="text" class="form-control form-control-premium" id="zone_affectation" name="zone_affectation" value="{{ user.zone_affectation if action == 'edit' and user.zone_affectation else '' }}" placeholder="Ex: Paris Centre, Rive Gauche...">
-                        <div class="form-text">Applicable uniquement pour les agents immobiliers.</div>
                     </div>
                 </div>
 
@@ -71,21 +66,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const roleSelect = document.getElementById('role');
-        const zoneContainer = document.getElementById('zone_affectation_container');
-        
-        function toggleZone() {
-            if (roleSelect.value === 'Agent immobilier') {
-                zoneContainer.style.display = 'block';
-            } else {
-                zoneContainer.style.display = 'none';
-            }
-        }
-        
-        roleSelect.addEventListener('change', toggleZone);
-        toggleZone(); // Initial check
-    });
-</script>
 {% endblock %}

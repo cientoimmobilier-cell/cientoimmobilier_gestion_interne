@@ -59,6 +59,7 @@
                                 <a href="{{ url_for('clients.edit_client', client_id=client.id) }}" class="btn btn-sm btn-outline-secondary rounded-3 me-1" title="Modifier"><i class="fa-solid fa-pen"></i></a>
                                 {% if current_user.role in ['Administrateur', 'Directeur'] %}
                                 <form action="{{ url_for('clients.delete_client', client_id=client.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce client ? Toutes ses demandes et visites associées seront également supprimées.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
                                 </form>
                                 {% endif %}
@@ -85,8 +86,9 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form action="{{ url_for('clients.import_clients') }}" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body p-4">
-                    <p class="small text-muted mb-3">Sélectionnez un fichier Excel (<code>.xlsx</code>). La première ligne doit contenir les en-têtes de colonnes dans l'ordre suivant : <br><strong>Code Client, Nom, Prénom, Téléphone, Téléphone 2, E-mail, Adresse, Ville, Profession, Budget Min, Budget Max, Source, Observations</strong>.</p>
+                    <p class="small text-muted mb-3">Sélectionnez un fichier Excel (<code>.xlsx</code>). La première ligne doit contenir les en-têtes de colonnes dans l'ordre suivant : <br><strong>Code Client, Nom, Prénom, Téléphone, Téléphone 2, E-mail, Adresse, Ville, Profession, Zone Ciblée, Description, Budget Min, Budget Max, Source, Observations</strong>.</p>
                     <div class="mb-3">
                         <label for="excel_file" class="form-label fw-semibold">Fichier Excel</label>
                         <input class="form-control form-control-premium" type="file" id="excel_file" name="excel_file" accept=".xlsx" required>

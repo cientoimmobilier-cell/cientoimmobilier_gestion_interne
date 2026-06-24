@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des {{ type_mvt }}s - Ciento Immobilier{% endblock %}
+{% block header_title %}Gestion des {{ type_mvt }}s{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">Historique des {{ type_mvt }}s</h5>
+                <button class="btn btn-accent btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addMouvementModal"><i class="fa-solid fa-plus me-1"></i> Saisir une {{ type_mvt }}</button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Montant</th>
+                            <th>Catégorie</th>
+                            <th>Description</th>
+                            <th>Méthode</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mvt in mouvements %}
+                        <tr>
+                            <td>{{ mvt.date_mouvement.strftime('%d/%m/%Y') }}</td>
+                            <td class="fw-bold {% if type_mvt == 'Recette' %}text-success{% else %}text-danger{% endif %}">
+                                {% if type_mvt == 'Recette' %}+{% else %}-{% endif %} {{ mvt.montant | format_price }}
+                            </td>
+                            <td><span class="badge bg-light text-dark border">{{ mvt.categorie or 'Non classée' }}</span></td>
+                            <td>{{ mvt.description or '-' }}</td>
+                            <td>{{ mvt.methode_paiement or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">Aucune {{ type_mvt|lower }} enregistrée.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ajout Mouvement -->
+<div class="modal fade" id="addMouvementModal" tabindex="-1" aria-labelledby="addMouvementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light border-0">
+                <h5 class="modal-title fw-bold text-dark" id="addMouvementModalLabel">Saisir une {{ type_mvt }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('finance.add_mouvement') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="type_mouvement" value="{{ type_mvt }}">
+                <div class="modal-body p-4">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Montant</label>
+                            <input type="number" step="0.01" class="form-control form-control-premium" name="montant" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Devise</label>
+                            <select class="form-select form-control-premium" name="devise" required>
+                                <option value="EUR">EUR (€)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="HTG">HTG</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Date</label>
+                            <input type="date" class="form-control form-control-premium" name="date_mouvement" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Catégorie</label>
+                            <input type="text" class="form-control form-control-premium" name="categorie" placeholder="Loyer, Salaire, Achat, etc." required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Compte Bancaire (Optionnel)</label>
+                            <select class="form-select form-control-premium" name="compte_bancaire_id">
+                                <option value="">-- Aucun --</option>
+                                {% for c in comptes %}
+                                <option value="{{ c.id }}">{{ c.nom_banque }} - {{ c.numero_compte }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Caisse (Optionnel)</label>
+                            <select class="form-select form-control-premium" name="caisse_id">
+                                <option value="">-- Aucune --</option>
+                                {% for ca in caisses %}
+                                <option value="{{ ca.id }}">{{ ca.nom }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Si un compte ou une caisse est sélectionné, le solde sera automatiquement mis à jour.</small>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-muted small fw-semibold">Méthode de paiement</label>
+                            <select class="form-select form-control-premium" name="methode_paiement" required>
+                                <option value="Virement">Virement</option>
+                                <option value="Chèque">Chèque</option>
+                                <option value="Espèces">Espèces</option>
+                                <option value="Carte">Carte</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-semibold">Description</label>
+                        <textarea class="form-control form-control-premium" name="description" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-accent rounded-3">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

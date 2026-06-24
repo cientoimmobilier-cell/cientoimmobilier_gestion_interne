@@ -10,6 +10,7 @@
             <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-address-card text-warning me-2"></i>Informations Client</h5>
             
             <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row">
                     <!-- Prénom -->
                     <div class="col-md-6 mb-3">
@@ -66,6 +67,19 @@
                             <option value="Panneau Agence" {% if client and client.source_client == 'Panneau Agence' %}selected{% endif %}>Panneau / Vitrine Agence</option>
                             <option value="Autre" {% if client and client.source_client == 'Autre' %}selected{% endif %}>Autre</option>
                         </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Zone Ciblée -->
+                    <div class="col-md-6 mb-3">
+                        <label for="zone_ciblee" class="form-label fw-semibold" style="font-size: 0.9rem;">Zone ciblée</label>
+                        <input type="text" class="form-control form-control-premium" id="zone_ciblee" name="zone_ciblee" placeholder="Paris 16ème, Neuilly-sur-Seine, Boulogne..." value="{{ client.zone_ciblee if client else '' }}">
+                    </div>
+                    <!-- Description -->
+                    <div class="col-md-6 mb-3">
+                        <label for="description" class="form-label fw-semibold" style="font-size: 0.9rem;">Description du client</label>
+                        <textarea class="form-control form-control-premium" id="description" name="description" rows="1" placeholder="Description rapide du profil client...">{{ client.description if client else '' }}</textarea>
                     </div>
                 </div>
 

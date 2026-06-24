@@ -2,12 +2,12 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from flask_login import login_required, current_user
 from app.models import (Propriete, Proprietaire, Caracteristique, PhotoPropriete, 
                         DocumentPropriete, Visite, Client, Utilisateur)
-from app.utils import log_activity, role_required
+from app.utils.helpers import log_activity, role_required
 from app import db
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
-from app.excel_utils import export_properties_to_excel, import_properties_from_excel
+from app.services.excel_service import export_properties_to_excel, import_properties_from_excel
 
 properties = Blueprint('properties', __name__)
 

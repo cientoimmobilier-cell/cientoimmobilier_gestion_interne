@@ -10,6 +10,7 @@
             <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-hotel text-warning me-2"></i>Caractéristiques du bien immobilier</h5>
             
             <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row">
                     <!-- Titre -->
                     <div class="col-12 mb-3">
