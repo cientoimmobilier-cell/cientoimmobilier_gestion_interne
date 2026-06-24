@@ -15,7 +15,14 @@ class Config:
     db_port = os.environ.get('DB_PORT', '5432')
     db_name = os.environ.get('DB_NAME', 'ciento_immobilier')
     
-    SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    # Render fournit l'URL complète via DATABASE_URL
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql://", 1)
+        SQLALCHEMY_DATABASE_URI = database_url
+    else:
+        SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Dossier d'upload pour les images et documents
