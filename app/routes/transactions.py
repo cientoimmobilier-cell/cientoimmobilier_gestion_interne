@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, current_app, send_file
 from flask_login import login_required, current_user
 from app.models import Transaction, Client, Propriete, Utilisateur, Commission, Paiement, Contrat
-from app.utils.helpers import log_activity
+from app.utils.helpers import log_activity, sanitize_search
 from app import db
 from app.services.pdf_service import generate_transaction_sheet_pdf, generate_payment_receipt_pdf
 from app.services.excel_service import export_transactions_to_excel
@@ -26,9 +26,11 @@ def list_transactions():
     query = Transaction.query
     
     if search:
+        safe_search = sanitize_search(search)
+        like_pattern = f'%{safe_search}%'
         query = query.filter(
-            (Transaction.reference_transaction.ilike(f'%{search}%')) |
-            (Transaction.observations.ilike(f'%{search}%'))
+            (Transaction.reference_transaction.ilike(like_pattern)) |
+            (Transaction.observations.ilike(like_pattern))
         )
     if type_tx:
         query = query.filter_by(type_transaction=type_tx)
@@ -115,7 +117,7 @@ def add_transaction():
             return redirect(url_for('transactions.view_transaction', tx_id=new_tx.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur d'enregistrement: {e}", "danger")
+            flash("Erreur lors de l'enregistrement. Veuillez réessayer.", "danger")
             
     return render_template(
         'transactions/form.html',
@@ -157,7 +159,7 @@ def finalize_transaction(tx_id):
         flash(f"La transaction {tx.reference_transaction} a été finalisée. Le bien est désormais marqué comme {prop.statut}.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur lors de la finalisation: {e}", "danger")
+        flash("Erreur lors de la finalisation. Veuillez réessayer.", "danger")
         
     return redirect(url_for('transactions.view_transaction', tx_id=tx_id))
 
@@ -182,7 +184,7 @@ def delete_transaction(tx_id):
         flash(f"La transaction {ref} a été supprimée. La propriété est de nouveau disponible.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur lors de la suppression: {e}", "danger")
+        flash("Erreur lors de la suppression. Veuillez réessayer.", "danger")
         
     return redirect(url_for('transactions.list_transactions'))
 
@@ -196,9 +198,11 @@ def export_transactions():
     query = Transaction.query
     
     if search:
+        safe_search = sanitize_search(search)
+        like_pattern = f'%{safe_search}%'
         query = query.filter(
-            (Transaction.reference_transaction.ilike(f'%{search}%')) |
-            (Transaction.observations.ilike(f'%{search}%'))
+            (Transaction.reference_transaction.ilike(like_pattern)) |
+            (Transaction.observations.ilike(like_pattern))
         )
     if type_tx:
         query = query.filter_by(type_transaction=type_tx)
@@ -288,7 +292,7 @@ def edit_transaction(tx_id):
             return redirect(url_for('transactions.view_transaction', tx_id=tx.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur d'enregistrement: {e}", "danger")
+            flash("Erreur lors de la modification. Veuillez réessayer.", "danger")
             
     return render_template(
         'transactions/form.html',
@@ -333,7 +337,7 @@ def add_payment(tx_id):
         flash("Le paiement a été enregistré avec succès.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur d'ajout de paiement: {e}", "danger")
+        flash("Erreur lors de l'ajout du paiement. Veuillez réessayer.", "danger")
         
     return redirect(url_for('transactions.view_transaction', tx_id=tx_id))
 
@@ -386,7 +390,7 @@ def add_contract(tx_id):
             flash("Le contrat a été enregistré et téléversé.", "success")
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur d'enregistrement du contrat: {e}", "danger")
+            flash("Erreur lors de l'enregistrement du contrat. Veuillez réessayer.", "danger")
     else:
         flash("Seuls les fichiers PDF sont autorisés pour les contrats.", "danger")
         

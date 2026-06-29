@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, render_template_string
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
@@ -91,6 +91,73 @@ def create_app(config_class=None):
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        # Content Security Policy — autorise Bootstrap/FontAwesome CDN et inline styles nécessaires
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+            "style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline'; "
+            "font-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+            "img-src 'self' data:; "
+            "frame-ancestors 'self'"
+        )
+        response.headers['Permissions-Policy'] = 'geolocation=(), camera=(), microphone=()'
+        # HSTS uniquement si pas en mode debug (nécessite HTTPS)
+        if not app.debug:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         return response
+
+    # Gestionnaires d'erreurs — ne jamais divulguer les détails internes
+    @app.errorhandler(403)
+    def forbidden_error(error):
+        return render_template_string('''
+            {% extends "base.html" %}
+            {% block title %}Accès refusé{% endblock %}
+            {% block header_title %}Accès refusé{% endblock %}
+            {% block content %}
+            <div class="text-center py-5">
+                <i class="fa-solid fa-lock fa-3x text-warning mb-3"></i>
+                <h3>Accès refusé</h3>
+                <p class="text-muted">Vous n'avez pas l'autorisation d'accéder à cette page.</p>
+                <a href="{{ url_for('dashboard.index') }}" class="btn btn-accent rounded-3 mt-3">Retour au tableau de bord</a>
+            </div>
+            {% endblock %}
+        '''), 403
+
+    @app.errorhandler(404)
+    def not_found_error(error):
+        return render_template_string('''
+            {% extends "base.html" %}
+            {% block title %}Page introuvable{% endblock %}
+            {% block header_title %}Page introuvable{% endblock %}
+            {% block content %}
+            <div class="text-center py-5">
+                <i class="fa-solid fa-map-signs fa-3x text-muted mb-3"></i>
+                <h3>Page introuvable</h3>
+                <p class="text-muted">La page demandée n'existe pas.</p>
+                <a href="{{ url_for('dashboard.index') }}" class="btn btn-accent rounded-3 mt-3">Retour au tableau de bord</a>
+            </div>
+            {% endblock %}
+        '''), 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        db.session.rollback()
+        return render_template_string('''
+            {% extends "base.html" %}
+            {% block title %}Erreur serveur{% endblock %}
+            {% block header_title %}Erreur serveur{% endblock %}
+            {% block content %}
+            <div class="text-center py-5">
+                <i class="fa-solid fa-triangle-exclamation fa-3x text-danger mb-3"></i>
+                <h3>Erreur interne du serveur</h3>
+                <p class="text-muted">Une erreur inattendue s'est produite. L'administrateur a été notifié.</p>
+                <a href="{{ url_for('dashboard.index') }}" class="btn btn-accent rounded-3 mt-3">Retour au tableau de bord</a>
+            </div>
+            {% endblock %}
+        '''), 500
+        
+    @app.route('/health')
+    def health_check():
+        return "OK", 200
             
     return app

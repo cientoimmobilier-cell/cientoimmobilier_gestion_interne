@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
 from flask_login import login_required, current_user
 from app.models import BienAirbnb, ReservationAirbnb, Proprietaire, Utilisateur
-from app.utils.helpers import log_activity
+from app.utils.helpers import log_activity, sanitize_search
 from app.services.pdf_service import generate_airbnb_sheet_pdf
 from app import db
 from datetime import datetime, date
@@ -18,16 +18,18 @@ def list_biens():
     query = BienAirbnb.query
     
     if search:
+        safe_search = sanitize_search(search)
+        like_pattern = f'%{safe_search}%'
         query = query.filter(
-            (BienAirbnb.titre.ilike(f'%{search}%')) |
-            (BienAirbnb.reference.ilike(f'%{search}%')) |
-            (BienAirbnb.ville.ilike(f'%{search}%')) |
-            (BienAirbnb.quartier.ilike(f'%{search}%'))
+            (BienAirbnb.titre.ilike(like_pattern)) |
+            (BienAirbnb.reference.ilike(like_pattern)) |
+            (BienAirbnb.ville.ilike(like_pattern)) |
+            (BienAirbnb.quartier.ilike(like_pattern))
         )
     if statut_filter:
         query = query.filter(BienAirbnb.statut == statut_filter)
     if ville_filter:
-        query = query.filter(BienAirbnb.ville.ilike(f'%{ville_filter}%'))
+        query = query.filter(BienAirbnb.ville.ilike(f'%{sanitize_search(ville_filter)}%'))
     
     biens = query.order_by(BienAirbnb.date_ajout.desc()).all()
     
@@ -87,7 +89,7 @@ def add_bien():
             return redirect(url_for('airbnb.view_bien', bien_id=new_bien.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur lors de la création: {e}", "danger")
+            flash("Erreur lors de la création. Veuillez réessayer.", "danger")
     
     proprietaires = Proprietaire.query.order_by(Proprietaire.nom.asc()).all()
     agents = Utilisateur.query.filter_by(role='Agent immobilier', actif=True).order_by(Utilisateur.nom.asc()).all()
@@ -129,7 +131,7 @@ def edit_bien(bien_id):
             return redirect(url_for('airbnb.view_bien', bien_id=bien.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur de modification: {e}", "danger")
+            flash("Erreur lors de la modification. Veuillez réessayer.", "danger")
     
     proprietaires = Proprietaire.query.order_by(Proprietaire.nom.asc()).all()
     agents = Utilisateur.query.filter_by(role='Agent immobilier', actif=True).order_by(Utilisateur.nom.asc()).all()
@@ -168,7 +170,7 @@ def delete_bien(bien_id):
         flash(f"Le bien « {titre} » a été supprimé.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Impossible de supprimer ce bien: {e}", "danger")
+        flash("Impossible de supprimer ce bien. Veuillez réessayer.", "danger")
     
     return redirect(url_for('airbnb.list_biens'))
 
@@ -209,7 +211,7 @@ def add_reservation(bien_id):
         flash(f"Réservation de {new_reservation.nom_voyageur} enregistrée ({nombre_nuits} nuits).", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur d'enregistrement: {e}", "danger")
+        flash("Erreur lors de l'enregistrement de la réservation. Veuillez réessayer.", "danger")
     
     return redirect(url_for('airbnb.view_bien', bien_id=bien_id))
 
@@ -226,7 +228,7 @@ def delete_reservation(reservation_id):
         flash("Réservation supprimée.", "info")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur: {e}", "danger")
+        flash("Erreur lors de la suppression. Veuillez réessayer.", "danger")
     
     return redirect(url_for('airbnb.view_bien', bien_id=bien_id))
 

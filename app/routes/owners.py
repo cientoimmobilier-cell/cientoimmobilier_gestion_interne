@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
 from flask_login import login_required, current_user
 from app.models import Proprietaire, Propriete
-from app.utils.helpers import log_activity
+from app.utils.helpers import log_activity, sanitize_search
 from app import db
 from datetime import datetime
 from app.services.excel_service import export_owners_to_excel, import_owners_from_excel
@@ -13,11 +13,13 @@ owners = Blueprint('owners', __name__)
 def list_owners():
     search = request.args.get('search', '')
     if search:
+        safe_search = sanitize_search(search)
+        like_pattern = f'%{safe_search}%'
         owners_list = Proprietaire.query.filter(
-            (Proprietaire.nom.ilike(f'%{search}%')) |
-            (Proprietaire.prenom.ilike(f'%{search}%')) |
-            (Proprietaire.email.ilike(f'%{search}%')) |
-            (Proprietaire.telephone.ilike(f'%{search}%'))
+            (Proprietaire.nom.ilike(like_pattern)) |
+            (Proprietaire.prenom.ilike(like_pattern)) |
+            (Proprietaire.email.ilike(like_pattern)) |
+            (Proprietaire.telephone.ilike(like_pattern))
         ).order_by(Proprietaire.nom.asc()).all()
     else:
         owners_list = Proprietaire.query.order_by(Proprietaire.nom.asc()).all()
@@ -54,7 +56,7 @@ def add_owner():
             return redirect(url_for('owners.view_owner', owner_id=new_owner.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur lors de la création du propriétaire: {e}", "danger")
+            flash("Erreur lors de la création du propriétaire. Veuillez réessayer.", "danger")
             
     return render_template('owners/form.html', owner=None, action_title="Ajouter un propriétaire")
 
@@ -79,7 +81,7 @@ def edit_owner(owner_id):
             return redirect(url_for('owners.view_owner', owner_id=owner_obj.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur lors de la modification: {e}", "danger")
+            flash("Erreur lors de la modification. Veuillez réessayer.", "danger")
             
     return render_template('owners/form.html', owner=owner_obj, action_title=f"Modifier {owner_obj.prenom} {owner_obj.nom}")
 
@@ -105,7 +107,7 @@ def delete_owner(owner_id):
         flash(f"Le propriétaire {nom_complet} a été supprimé.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Impossible de supprimer ce propriétaire: {e}", "danger")
+        flash("Impossible de supprimer ce propriétaire. Veuillez réessayer.", "danger")
         
     return redirect(url_for('owners.list_owners'))
 
@@ -174,6 +176,6 @@ def import_owners():
         flash(f"Importation réussie : {imported_count} propriétaires créés, {updated_count} fiches mises à jour.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur d'importation : {e}", "danger")
+        flash("Erreur lors de l'importation. Vérifiez le format du fichier.", "danger")
         
     return redirect(url_for('owners.list_owners'))

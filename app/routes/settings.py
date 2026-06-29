@@ -52,7 +52,9 @@ def add_user():
         db.session.commit()
         
         log_activity(current_user.id, 'Création', 'utilisateurs', user.id)
-        flash(f'Utilisateur créé avec succès. Mot de passe généré : {password} (À transmettre à l\'utilisateur)', 'success')
+        flash(f'Utilisateur créé avec succès.', 'success')
+        flash(f'Mot de passe temporaire : {password}', 'password')
+        flash('Copiez ce mot de passe maintenant. Il ne sera plus affiché.', 'warning')
         return redirect(url_for('settings.list_users'))
         
     return render_template('settings/user_form.html', action="add")
@@ -117,9 +119,11 @@ def reset_user_password(id):
     try:
         db.session.commit()
         log_activity(current_user.id, f"Réinitialisation mot de passe de {user.prenom} {user.nom}", "utilisateurs", user.id)
-        flash(f"Mot de passe de {user.prenom} {user.nom} réinitialisé : {new_password} (À transmettre de manière sécurisée)", "success")
+        flash(f"Mot de passe de {user.prenom} {user.nom} réinitialisé.", "success")
+        flash(f"Nouveau mot de passe : {new_password}", "password")
+        flash("Copiez ce mot de passe maintenant. Il ne sera plus affiché.", "warning")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur : {e}", "danger")
+        flash("Erreur lors de la réinitialisation. Veuillez réessayer.", "danger")
     
     return redirect(url_for('settings.list_users'))

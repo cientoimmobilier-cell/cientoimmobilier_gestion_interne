@@ -12,6 +12,7 @@ services:
     region: frankfurt # Optionnel
     plan: free # A ajuster selon le besoin en production
     buildCommand: "pip install -r requirements.txt"
+    preDeployCommand: "python init_db.py"
     startCommand: "gunicorn run:app"
     envVars:
       - key: PYTHON_VERSION

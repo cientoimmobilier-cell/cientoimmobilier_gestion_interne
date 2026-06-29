@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required, current_user
 from app.models import Utilisateur, Transaction, Visite, Commission, BienAirbnb
-from app.utils.helpers import log_activity, role_required
+from app.utils.helpers import log_activity, role_required, sanitize_search
 from app import db
 from sqlalchemy import func
 import string
@@ -22,13 +22,15 @@ def list_agents():
     query = Utilisateur.query.filter_by(role='Agent immobilier')
     
     if search:
+        safe_search = sanitize_search(search)
+        like_pattern = f'%{safe_search}%'
         query = query.filter(
-            (Utilisateur.nom.ilike(f'%{search}%')) |
-            (Utilisateur.prenom.ilike(f'%{search}%')) |
-            (Utilisateur.email.ilike(f'%{search}%'))
+            (Utilisateur.nom.ilike(like_pattern)) |
+            (Utilisateur.prenom.ilike(like_pattern)) |
+            (Utilisateur.email.ilike(like_pattern))
         )
     if zone_filter:
-        query = query.filter(Utilisateur.zone_affectation.ilike(f'%{zone_filter}%'))
+        query = query.filter(Utilisateur.zone_affectation.ilike(f'%{sanitize_search(zone_filter)}%'))
     
     agents_list = query.order_by(Utilisateur.nom.asc()).all()
     
@@ -100,7 +102,7 @@ def affecter_zone(agent_id):
         flash(f"Zone d'affectation de {agent.prenom} {agent.nom} mise à jour : {nouvelle_zone or 'Aucune'}.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur: {e}", "danger")
+        flash("Erreur lors de la mise à jour. Veuillez réessayer.", "danger")
     
     return redirect(url_for('agents.view_agent', agent_id=agent_id))
 

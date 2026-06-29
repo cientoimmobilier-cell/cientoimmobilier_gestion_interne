@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from flask_login import login_required, current_user
 from app.models import (Propriete, Proprietaire, Caracteristique, PhotoPropriete, 
                         DocumentPropriete, Visite, Client, Utilisateur)
-from app.utils.helpers import log_activity, role_required
+from app.utils.helpers import log_activity, role_required, sanitize_search, safe_path_join
 from app import db
 from datetime import datetime
 from werkzeug.utils import secure_filename
@@ -14,8 +14,26 @@ properties = Blueprint('properties', __name__)
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
 ALLOWED_DOC_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'}
 
+# Magic bytes pour la validation MIME réelle des images
+IMAGE_MAGIC_BYTES = {
+    b'\xff\xd8\xff': 'jpg',       # JPEG
+    b'\x89PNG': 'png',             # PNG
+    b'GIF87a': 'gif',              # GIF87a
+    b'GIF89a': 'gif',              # GIF89a
+    b'RIFF': 'webp',               # WebP (vérification partielle)
+}
+
 def allowed_file(filename, allowed_set):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_set
+
+def validate_image_content(file_stream):
+    """Vérifie que le contenu réel du fichier correspond à une image (Fix #6)."""
+    header = file_stream.read(8)
+    file_stream.seek(0)  # Rembobiner pour le save() ultérieur
+    for magic, ext in IMAGE_MAGIC_BYTES.items():
+        if header.startswith(magic):
+            return True
+    return False
 
 @properties.route('/')
 @login_required
@@ -29,11 +47,13 @@ def list_properties():
     query = Propriete.query
     
     if search:
+        safe_search = sanitize_search(search)
+        like_pattern = f'%{safe_search}%'
         query = query.filter(
-            (Propriete.reference_bien.ilike(f'%{search}%')) |
-            (Propriete.titre.ilike(f'%{search}%')) |
-            (Propriete.ville.ilike(f'%{search}%')) |
-            (Propriete.quartier.ilike(f'%{search}%'))
+            (Propriete.reference_bien.ilike(like_pattern)) |
+            (Propriete.titre.ilike(like_pattern)) |
+            (Propriete.ville.ilike(like_pattern)) |
+            (Propriete.quartier.ilike(like_pattern))
         )
     if type_bien:
         query = query.filter_by(type_bien=type_bien)
@@ -124,7 +144,7 @@ def add_property():
             return redirect(url_for('properties.view_property', property_id=new_prop.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur lors de la création: {e}", "danger")
+            flash("Erreur lors de la création de la propriété. Veuillez réessayer.", "danger")
             
     return render_template('properties/form.html', property=None, proprietaires=proprietaires, caracteristiques=caracteristiques, action_title="Ajouter une propriété")
 
@@ -168,7 +188,7 @@ def edit_property(property_id):
             return redirect(url_for('properties.view_property', property_id=prop.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur lors de la modification: {e}", "danger")
+            flash("Erreur lors de la modification. Veuillez réessayer.", "danger")
             
     return render_template('properties/form.html', property=prop, proprietaires=proprietaires, caracteristiques=caracteristiques, action_title=f"Modifier {prop.reference_bien}")
 
@@ -189,17 +209,22 @@ def delete_property(property_id):
     prop = Propriete.query.get_or_404(property_id)
     ref = prop.reference_bien
     
-    # Supprimer les fichiers physiques associés
+    # Supprimer les fichiers physiques associés (avec validation de chemin)
+    static_dir = os.path.join(current_app.root_path, 'static')
     for photo in prop.photos:
         try:
-            os.remove(os.path.join(current_app.root_path, 'static', photo.chemin_fichier))
-        except:
-            pass
+            safe_path = safe_path_join(static_dir, photo.chemin_fichier)
+            if safe_path and os.path.exists(safe_path):
+                os.remove(safe_path)
+        except Exception as e:
+            current_app.logger.warning(f"Erreur suppression photo {photo.id}: {e}")
     for doc in prop.documents:
         try:
-            os.remove(os.path.join(current_app.root_path, 'static', doc.chemin_fichier))
-        except:
-            pass
+            safe_path = safe_path_join(static_dir, doc.chemin_fichier)
+            if safe_path and os.path.exists(safe_path):
+                os.remove(safe_path)
+        except Exception as e:
+            current_app.logger.warning(f"Erreur suppression document {doc.id}: {e}")
             
     try:
         db.session.delete(prop)
@@ -208,7 +233,7 @@ def delete_property(property_id):
         flash(f"La propriété {ref} a été supprimée.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur lors de la suppression: {e}", "danger")
+        flash("Erreur lors de la suppression. Veuillez réessayer.", "danger")
         
     return redirect(url_for('properties.list_properties'))
 
@@ -227,6 +252,10 @@ def upload_photos(property_id):
     
     for file in files:
         if file and allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS):
+            # Validation du contenu réel du fichier (Fix #6)
+            if not validate_image_content(file.stream):
+                continue  # Ignorer les fichiers dont le contenu ne correspond pas
+            
             filename = secure_filename(file.filename)
             unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{filename}"
             filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'photos', unique_filename)
@@ -267,13 +296,14 @@ def delete_photo(photo_id):
     photo = PhotoPropriete.query.get_or_404(photo_id)
     property_id = photo.propriete_id
     
-    # Supprimer le fichier
-    filepath = os.path.join(current_app.root_path, 'static', photo.chemin_fichier)
+    # Supprimer le fichier (avec validation de chemin)
+    static_dir = os.path.join(current_app.root_path, 'static')
+    safe_path = safe_path_join(static_dir, photo.chemin_fichier)
     try:
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        if safe_path and os.path.exists(safe_path):
+            os.remove(safe_path)
     except Exception as e:
-        print(f"Erreur suppression fichier: {e}")
+        current_app.logger.warning(f"Erreur suppression fichier photo {photo_id}: {e}")
         
     was_main = photo.photo_principale
     
@@ -368,13 +398,14 @@ def delete_document(doc_id):
     doc = DocumentPropriete.query.get_or_404(doc_id)
     property_id = doc.propriete_id
     
-    # Supprimer le fichier physique
-    filepath = os.path.join(current_app.root_path, 'static', doc.chemin_fichier)
+    # Supprimer le fichier physique (avec validation de chemin)
+    static_dir = os.path.join(current_app.root_path, 'static')
+    safe_path = safe_path_join(static_dir, doc.chemin_fichier)
     try:
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        if safe_path and os.path.exists(safe_path):
+            os.remove(safe_path)
     except Exception as e:
-        print(f"Erreur suppression document: {e}")
+        current_app.logger.warning(f"Erreur suppression document {doc_id}: {e}")
         
     try:
         db.session.delete(doc)

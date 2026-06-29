@@ -5,6 +5,7 @@ from app.utils.helpers import log_activity
 from app import db
 from datetime import datetime, timedelta
 from collections import defaultdict
+from urllib.parse import urlparse
 
 auth = Blueprint('auth', __name__)
 
@@ -36,6 +37,14 @@ def _record_failed_attempt(ip):
 def _reset_attempts(ip):
     """Réinitialise le compteur après une connexion réussie."""
     _login_attempts[ip] = {'count': 0, 'first_attempt': None}
+
+def _is_safe_redirect_url(target):
+    """Vérifie qu'une URL de redirection est sûre (interne uniquement)."""
+    if not target:
+        return False
+    parsed = urlparse(target)
+    # N'autoriser que les URLs relatives (pas de scheme ni de netloc)
+    return parsed.scheme == '' and parsed.netloc == '' and target.startswith('/')
 
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
@@ -77,8 +86,11 @@ def login():
         login_user(user, remember=remember)
         log_activity(user.id, "Connexion réussie")
         
+        # Validation de l'URL de redirection (Fix #1 — Open Redirect)
         next_page = request.args.get('next')
-        return redirect(next_page or url_for('dashboard.index'))
+        if next_page and _is_safe_redirect_url(next_page):
+            return redirect(next_page)
+        return redirect(url_for('dashboard.index'))
         
     return render_template('auth/login.html')
 

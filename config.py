@@ -8,6 +8,11 @@ load_dotenv(os.path.join(basedir, '.env'))
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
     
+    # Vérifier que le SECRET_KEY est suffisamment fort
+    if len(SECRET_KEY) < 32:
+        import warnings
+        warnings.warn("SECRET_KEY trop court ! Utilisez au moins 32 caractères.", stacklevel=2)
+    
     # Construction de l'URI PostgreSQL à partir des variables d'environnement
     db_user = os.environ.get('DB_USER', 'postgres')
     db_password = os.environ.get('DB_PASSWORD', 'postgres')
@@ -36,5 +41,16 @@ class Config:
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = 3600  # 1 heure
     
+    # Sécurité du cookie "Remember Me"
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = 'Lax'
+    
+    # Protection CSRF — durée de validité du token (1 heure)
+    WTF_CSRF_TIME_LIMIT = 3600
+    
     # Mode debug configurable
     DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
+    
+    # SESSION_COOKIE_SECURE activé seulement hors debug (nécessite HTTPS)
+    SESSION_COOKIE_SECURE = not DEBUG
+    REMEMBER_COOKIE_SECURE = not DEBUG

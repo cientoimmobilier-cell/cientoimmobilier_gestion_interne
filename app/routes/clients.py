@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
 from flask_login import login_required, current_user
 from app.models import Client, DemandeClient
-from app.utils.helpers import log_activity
+from app.utils.helpers import log_activity, sanitize_search
 from app import db
 from datetime import datetime
 from app.services.excel_service import export_clients_to_excel, import_clients_from_excel
@@ -14,12 +14,14 @@ def list_clients():
     search = request.args.get('search', '')
     if search:
         # Recherche par nom, prenom, email, telephone ou code_client
+        safe_search = sanitize_search(search)
+        like_pattern = f'%{safe_search}%'
         clients_list = Client.query.filter(
-            (Client.nom.ilike(f'%{search}%')) |
-            (Client.prenom.ilike(f'%{search}%')) |
-            (Client.email.ilike(f'%{search}%')) |
-            (Client.telephone.ilike(f'%{search}%')) |
-            (Client.code_client.ilike(f'%{search}%'))
+            (Client.nom.ilike(like_pattern)) |
+            (Client.prenom.ilike(like_pattern)) |
+            (Client.email.ilike(like_pattern)) |
+            (Client.telephone.ilike(like_pattern)) |
+            (Client.code_client.ilike(like_pattern))
         ).order_by(Client.nom.asc()).all()
     else:
         clients_list = Client.query.order_by(Client.nom.asc()).all()
@@ -77,7 +79,7 @@ def add_client():
             return redirect(url_for('clients.view_client', client_id=new_client.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur lors de la création du client: {e}", "danger")
+            flash("Erreur lors de la création du client. Veuillez réessayer.", "danger")
             
     return render_template('clients/form.html', client=None, action_title="Ajouter un client")
 
@@ -110,7 +112,7 @@ def edit_client(client_id):
             return redirect(url_for('clients.view_client', client_id=client_obj.id))
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur lors de la modification: {e}", "danger")
+            flash("Erreur lors de la modification. Veuillez réessayer.", "danger")
             
     return render_template('clients/form.html', client=client_obj, action_title=f"Modifier {client_obj.prenom} {client_obj.nom}")
 
@@ -137,7 +139,7 @@ def delete_client(client_id):
         flash(f"Le client {nom_complet} a été supprimé.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Impossible de supprimer ce client: {e}", "danger")
+        flash("Impossible de supprimer ce client. Veuillez réessayer.", "danger")
         
     return redirect(url_for('clients.list_clients'))
 
@@ -175,7 +177,7 @@ def add_demande(client_id):
         flash("Les critères de recherche ont été ajoutés pour ce client.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur d'ajout de critères: {e}", "danger")
+        flash("Erreur d'ajout de critères. Veuillez réessayer.", "danger")
         
     return redirect(url_for('clients.view_client', client_id=client_id))
 
@@ -192,7 +194,7 @@ def delete_demande(demande_id):
         flash("Critères de recherche retirés.", "info")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur lors de la suppression de critères: {e}", "danger")
+        flash("Erreur lors de la suppression de critères. Veuillez réessayer.", "danger")
         
     return redirect(url_for('clients.view_client', client_id=client_id))
 
@@ -281,6 +283,6 @@ def import_clients():
         flash(f"Importation réussie : {imported_count} clients créés, {updated_count} fiches mises à jour.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur d'importation : {e}", "danger")
+        flash("Erreur lors de l'importation. Vérifiez le format du fichier.", "danger")
         
     return redirect(url_for('clients.list_clients'))
