@@ -5,8 +5,7 @@ services:
     plan: free
     
     buildCommand: "pip install -r requirements.txt"
-    preDeployCommand: "python init_db.py"
-    startCommand: "gunicorn run:app"
+    startCommand: "python init_db.py && gunicorn run:app"
     
     envVars:
       - key: PYTHON_VERSION
@@ -25,6 +24,5 @@ services:
 databases:
   - name: ciento_immobilier_db
     databaseName: ciento_immobilier
-    user: postgres
     plan: free
     postgresMajorVersion: 15
