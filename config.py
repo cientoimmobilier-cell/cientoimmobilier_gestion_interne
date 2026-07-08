@@ -20,8 +20,8 @@ class Config:
     db_port = os.environ.get('DB_PORT', '5432')
     db_name = os.environ.get('DB_NAME', 'ciento_immobilier')
     
-    # Render fournit l'URL complète via DATABASE_URL
-    database_url = os.environ.get('DATABASE_URL')
+    # Render fournit DATABASE_URL, Vercel Postgres fournit POSTGRES_URL
+    database_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
     if database_url:
         if database_url.startswith("postgres://"):
             database_url = database_url.replace("postgres://", "postgresql://", 1)

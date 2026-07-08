@@ -64,7 +64,7 @@ def log_activity(user_id, action, table_concernee=None, enregistrement_id=None):
             enregistrement_id=enregistrement_id
         )
         db.session.add(log)
-        db.session.flush()  # Persiste dans la session parente sans commit isolé
+        db.session.commit()
     except Exception as e:
         db.session.rollback()
         logger.error(f"[JOURNAL] Échec enregistrement activité user_id={user_id}: {e}")

@@ -176,5 +176,24 @@ def create_app(config_class=None):
     @app.route('/health')
     def health_check():
         return "OK", 200
+        
+    @app.route('/setup-database')
+    def setup_database():
+        try:
+            db.create_all()
+            from app.models import Utilisateur
+            # Ajouter un admin si vide
+            if not Utilisateur.query.first():
+                admin = Utilisateur(
+                    nom='Immobilier', prenom='Admin', email='admin@ciento.immo',
+                    telephone='000', role='Administrateur', actif=True
+                )
+                admin.set_password('AdminCiento123!')
+                db.session.add(admin)
+                db.session.commit()
+                return "Base de donnees initialisee. Compte admin cree (admin@ciento.immo / AdminCiento123!)", 200
+            return "Base de donnees verifiee. Tables deja existantes.", 200
+        except Exception as e:
+            return f"Erreur de connexion a la base de donnees : {e}", 500
             
     return app
