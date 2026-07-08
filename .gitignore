@@ -1,12 +1,10 @@
-# Byte-compiled / optimized / DLL files
+# ── Byte-compiled / optimized / DLL files ──────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
 
-# Distribution / packaging
+# ── Distribution / packaging ────────────────────────────────────────────────
 .Python
 build/
 develop-eggs/
@@ -26,29 +24,67 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# ── Virtual environments ────────────────────────────────────────────────────
 venv/
 env/
 ENV/
 env.bak/
 venv.bak/
+.venv/
 
-# Environment variables
+# ── Environment variables ───────────────────────────────────────────────────
 .env
+# Garder .env.example (documentation de configuration)
 
-# Flask/SQLAlchemy
+# ── Flask / SQLAlchemy ──────────────────────────────────────────────────────
 instance/
 *.sqlite3
+*.db
 
-# Logs
+# ── Logs ────────────────────────────────────────────────────────────────────
 *.log
+logs/
 
-# IDE / Editor
+# ── IDE / Editors ───────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
-# Project specific
+# ── OS files ────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── Windows scripts locaux (non pertinents en production) ──────────────────
+*.bat
+*.ps1
+*.ico
+create_shortcut.*
+open_firewall.*
+start_ciento.*
+
+# ── Tests et scripts de diagnostic temporaires ─────────────────────────────
+diagnose_*.py
+test_*_insertion.py
+
+# ── Uploads utilisateur (données métier, ne pas versionner) ─────────────────
 app/static/uploads/*
 !app/static/uploads/.gitkeep
+app/static/uploads/photos/*
+!app/static/uploads/photos/.gitkeep
+app/static/uploads/documents/*
+!app/static/uploads/documents/.gitkeep
+
+# ── Fichiers de cache pytest / coverage ─────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/

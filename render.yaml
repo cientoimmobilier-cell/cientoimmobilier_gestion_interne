@@ -3,18 +3,22 @@ services:
     name: ciento-immobilier
     env: python
     plan: free
-    
+    runtime: python3.12
+
+    # Installation des dépendances
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python init_db.py && gunicorn run:app"
-    
+
+    # Initialisation DB puis démarrage Gunicorn (script shell pour éviter && instable)
+    startCommand: "python init_db.py; gunicorn run:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT"
+
     envVars:
       - key: PYTHON_VERSION
-        value: 3.12.3
+        value: "3.12.3"
       - key: FLASK_APP
         value: run.py
-      - key: FLASK_ENV
-        value: production
+      - key: FLASK_DEBUG
+        value: "0"
       - key: SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL 
+      - key: DATABASE_URL
         sync: false

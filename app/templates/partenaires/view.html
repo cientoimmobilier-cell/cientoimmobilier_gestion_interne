@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Détails du Partenaire - Ciento Immobilier{% endblock %}
+{% block header_title %}Fiche Partenaire{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card-premium mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="d-flex align-items-center">
+                    <div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm border border-2 border-warning" style="width: 60px; height: 60px;">
+                        <i class="fa-solid fa-handshake fa-2x text-dark"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0 text-dark">{{ partenaire.nom }}</h4>
+                        <span class="badge bg-light text-dark font-monospace mt-1">ID: {{ partenaire.numero_identification or 'Non défini' }}</span>
+                    </div>
+                </div>
+                <div>
+                    <a href="{{ url_for('partenaires.edit_partenaire', id=partenaire.id) }}" class="btn btn-outline-primary rounded-3"><i class="fa-solid fa-pen me-2"></i>Modifier</a>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded-3 border-start border-4 border-accent">
+                        <h6 class="fw-bold text-muted mb-3 text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem;">Informations Générales</h6>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Numéro Fiscal</small>
+                            <span class="fw-semibold">{{ partenaire.numero_fiscal or 'Non défini' }}</span>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted d-block">E-mail</small>
+                            {% if partenaire.email %}
+                            <a href="mailto:{{ partenaire.email }}" class="fw-semibold text-decoration-none">{{ partenaire.email }}</a>
+                            {% else %}
+                            <span class="text-muted font-italic">Non renseigné</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-0">
+                            <small class="text-muted d-block">Téléphone</small>
+                            {% if partenaire.telephone %}
+                            <a href="tel:{{ partenaire.telephone }}" class="fw-semibold text-decoration-none">{{ partenaire.telephone }}</a>
+                            {% else %}
+                            <span class="text-muted font-italic">Non renseigné</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded-3 border-start border-4 border-warning h-100">
+                        <h6 class="fw-bold text-muted mb-3 text-uppercase" style="letter-spacing: 1px; font-size: 0.8rem;">Statut du Contrat</h6>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Date de partenariat</small>
+                            <span class="fw-semibold">{{ partenaire.date_partenariat.strftime('%d/%m/%Y') if partenaire.date_partenariat else 'Non définie' }}</span>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted d-block">Contrat signé</small>
+                            {% if partenaire.contrat_signe %}
+                            <span class="badge bg-success rounded-pill px-3 py-2"><i class="fa-solid fa-check me-2"></i>Oui</span>
+                            {% else %}
+                            <span class="badge bg-danger rounded-pill px-3 py-2"><i class="fa-solid fa-xmark me-2"></i>Non</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-0">
+                            <small class="text-muted d-block">Date d'expiration</small>
+                            <span class="fw-semibold {% if partenaire.date_expiration_contrat %}text-dark{% else %}text-muted{% endif %}">
+                                {{ partenaire.date_expiration_contrat.strftime('%d/%m/%Y') if partenaire.date_expiration_contrat else 'Non définie' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+        </div>
+        
+        <!-- Critères & Conditions Section -->
+        <div class="card-premium mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list-check text-warning me-2"></i>Critères & Conditions ({{ partenaire.criteres|length }})</h6>
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#addCritereModal">
+                    <i class="fa-solid fa-plus me-2"></i>Ajouter un critère
+                </button>
+            </div>
+            
+            {% if partenaire.criteres %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Type / Nom</th>
+                            <th scope="col">Commission</th>
+                            <th scope="col">Options</th>
+                            <th scope="col" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for critere in partenaire.criteres %}
+                        <tr>
+                            <td class="fw-semibold">{{ critere.nom_critere }}</td>
+                            <td>
+                                {% if critere.commission %}
+                                <span class="badge bg-success-subtle text-success">{{ critere.commission }} %</span>
+                                <small class="text-muted ms-1">({{ critere.devise }})</small>
+                                {% else %}
+                                <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if critere.options_supplementaires %}
+                                <span class="text-muted small">{{ critere.options_supplementaires[:50] }}{% if critere.options_supplementaires|length > 50 %}...{% endif %}</span>
+                                {% else %}
+                                <span class="text-muted fst-italic">Aucune option</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                                <form action="{{ url_for('partenaires.delete_critere', critere_id=critere.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce critère ?');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 bg-light rounded-3 border border-dashed">
+                <i class="fa-solid fa-clipboard-list text-muted fa-2x mb-2"></i>
+                <p class="text-muted mb-0">Aucun critère défini pour ce partenaire.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card-premium">
+            <h6 class="fw-bold text-dark mb-4"><i class="fa-solid fa-file-contract text-warning me-2"></i>Documents Joints ({{ partenaire.documents|length }})</h6>
+            
+            {% if partenaire.documents %}
+            <div class="list-group list-group-flush rounded-3 border">
+                {% for doc in partenaire.documents %}
+                <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                    <div class="text-truncate me-3">
+                        <i class="fa-solid fa-file-pdf text-danger me-2"></i>
+                        <a href="{{ url_for('static', filename=doc.chemin_fichier.split('static/')[-1] if 'static/' in doc.chemin_fichier else doc.chemin_fichier) }}" target="_blank" class="text-decoration-none fw-semibold text-dark">{{ doc.nom_document }}</a>
+                        <br>
+                        <small class="text-muted">Ajouté le {{ doc.date_upload.strftime('%d/%m/%Y à %H:%M') }}</small>
+                    </div>
+                    {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                    <form action="{{ url_for('partenaires.delete_document', doc_id=doc.id) }}" method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce document ?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle"><i class="fa-solid fa-trash-can"></i></button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-4 bg-light rounded-3 border border-dashed">
+                <i class="fa-solid fa-folder-open text-muted fa-2x mb-2"></i>
+                <p class="text-muted mb-0">Aucun document joint pour ce partenaire.</p>
+            </div>
+            {% endif %}
+            
+            <div class="mt-4 text-center">
+                <a href="{{ url_for('partenaires.edit_partenaire', id=partenaire.id) }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un document</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ajouter Critère -->
+<div class="modal fade" id="addCritereModal" tabindex="-1" aria-labelledby="addCritereModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="addCritereModalLabel">Ajouter un nouveau critère</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('partenaires.add_critere', partenaire_id=partenaire.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="nom_critere" class="form-label fw-semibold">Nom du critère <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="nom_critere" name="nom_critere" required placeholder="Ex: Vente, Location, Gestion...">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="commission" class="form-label fw-semibold">Commission (%)</label>
+                            <input type="number" step="0.01" class="form-control" id="commission" name="commission" placeholder="Ex: 5.0">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="devise" class="form-label fw-semibold">Devise</label>
+                            <select class="form-select" id="devise" name="devise">
+                                <option value="EUR" selected>EUR (€)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="XOF">FCFA (XOF)</option>
+                                <option value="GNF">GNF</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="options_supplementaires" class="form-label fw-semibold">Options / Conditions adaptées</label>
+                        <textarea class="form-control" id="options_supplementaires" name="options_supplementaires" rows="3" placeholder="Ex: Applicable uniquement sur les biens de plus de 100 000€..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-accent rounded-3">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

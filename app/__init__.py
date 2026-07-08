@@ -1,4 +1,5 @@
 import os
+import logging
 from flask import Flask, render_template_string
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
@@ -18,6 +19,20 @@ def create_app(config_class=None):
     from config import Config
     app = Flask(__name__)
     app.config.from_object(config_class or Config)
+
+    # ── Configuration du logging Python ─────────────────────────────────────
+    # Format : timestamp | niveau | module | message
+    log_level = logging.DEBUG if app.config.get('DEBUG') else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=[logging.StreamHandler()]
+    )
+    # Réduire le bruit des bibliothèques tierces en production
+    if not app.config.get('DEBUG'):
+        logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+        logging.getLogger('werkzeug').setLevel(logging.WARNING)
     
     # Initialisation des extensions avec l'application
     db.init_app(app)
@@ -41,6 +56,7 @@ def create_app(config_class=None):
     from app.routes.airbnb import airbnb as airbnb_blueprint
     from app.routes.agents import agents as agents_blueprint
     from app.routes.finance import finance as finance_blueprint
+    from app.routes.partenaires import partenaires as partenaires_blueprint
     
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(dashboard_blueprint, url_prefix='/')
@@ -52,6 +68,7 @@ def create_app(config_class=None):
     app.register_blueprint(airbnb_blueprint, url_prefix='/airbnb')
     app.register_blueprint(agents_blueprint, url_prefix='/agents')
     app.register_blueprint(finance_blueprint, url_prefix='/finance')
+    app.register_blueprint(partenaires_blueprint, url_prefix='/partenaires')
     
     # Contexte global pour les templates (rôles et utilitaires)
     @app.context_processor

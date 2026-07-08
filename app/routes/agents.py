@@ -121,7 +121,10 @@ def add_agent():
             flash('Cet email est déjà utilisé.', 'danger')
             return redirect(url_for('agents.add_agent'))
             
-        password = generate_random_password()
+        password = request.form.get('password')
+        if not password:
+            flash('Le mot de passe est obligatoire.', 'danger')
+            return redirect(url_for('agents.add_agent'))
         
         agent = Utilisateur(
             nom=nom,

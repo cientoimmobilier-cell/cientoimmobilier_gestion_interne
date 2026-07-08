@@ -1,10 +1,15 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
+from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file, jsonify
 from flask_login import login_required, current_user
 from app.models import Client, DemandeClient
-from app.utils.helpers import log_activity, sanitize_search
+from app.utils.helpers import log_activity, sanitize_search, role_required
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
+import time
+import logging
+import traceback
 from app.services.excel_service import export_clients_to_excel, import_clients_from_excel
+
+logger = logging.getLogger(__name__)
 
 clients = Blueprint('clients', __name__)
 
@@ -30,6 +35,7 @@ def list_clients():
 
 @clients.route('/ajouter', methods=['GET', 'POST'])
 @login_required
+@role_required('Agent immobilier', 'Assistant')
 def add_client():
     if request.method == 'POST':
         nom = request.form.get('nom')
@@ -48,17 +54,43 @@ def add_client():
         source_client = request.form.get('source_client')
         observations = request.form.get('observations')
         
-        # Génération du code client unique
+        # --- Vérification des doublons ---
+        doublon = None
+        if telephone:
+            doublon = Client.query.filter(Client.telephone == telephone).first()
+            if doublon:
+                flash(f"⚠️ Doublon détecté : le téléphone <strong>{telephone}</strong> est déjà enregistré pour "
+                      f"<a href='{url_for('clients.view_client', client_id=doublon.id)}' class='alert-link'>"
+                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                return render_template('clients/form.html', client=None, action_title="Ajouter un client")
+        if email:
+            doublon = Client.query.filter(Client.email == email.lower()).first()
+            if doublon:
+                flash(f"⚠️ Doublon détecté : l'e-mail <strong>{email}</strong> est déjà enregistré pour "
+                      f"<a href='{url_for('clients.view_client', client_id=doublon.id)}' class='alert-link'>"
+                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                return render_template('clients/form.html', client=None, action_title="Ajouter un client")
+
+        # Génération du code client unique (timestamp + count pour éviter collision)
         count = Client.query.count()
-        code_client = f"CLI-{datetime.utcnow().year}-{count + 1:04d}"
+        ts_suffix = str(int(time.time() * 1000))[-4:]
+        code_client = f"CLI-{datetime.now(timezone.utc).year}-{count + 1:04d}-{ts_suffix}"
         
+        # Validation des champs obligatoires
+        if not nom or not nom.strip():
+            flash("Le nom de famille est obligatoire.", "danger")
+            return render_template('clients/form.html', client=None, action_title="Ajouter un client")
+        if not prenom or not prenom.strip():
+            flash("Le prénom est obligatoire.", "danger")
+            return render_template('clients/form.html', client=None, action_title="Ajouter un client")
+
         new_client = Client(
             code_client=code_client,
-            nom=nom.upper(), # Nom de famille toujours en majuscules
-            prenom=prenom.title(), # Prénom capitalisé
+            nom=nom.strip().upper(),       # Nom de famille toujours en majuscules
+            prenom=prenom.strip().title(), # Prénom capitalisé
             telephone=telephone,
             telephone_secondaire=telephone_secondaire,
-            email=email,
+            email=email.strip().lower() if email else None,  # Email normalisé
             adresse=adresse,
             ville=ville,
             profession=profession,
@@ -79,21 +111,56 @@ def add_client():
             return redirect(url_for('clients.view_client', client_id=new_client.id))
         except Exception as e:
             db.session.rollback()
-            flash("Erreur lors de la création du client. Veuillez réessayer.", "danger")
-            
+            # Log complet de l'erreur côté serveur (visible dans les logs)
+            logger.error(
+                f"[CLIENTS] Échec création client '{nom} {prenom}' "
+                f"par user_id={current_user.id} — {type(e).__name__}: {e}"
+            )
+            logger.error(traceback.format_exc())
+            flash(
+                f"Erreur lors de la création du client : {type(e).__name__}. "
+                "Consultez les logs serveur pour les détails.",
+                "danger"
+            )
+
     return render_template('clients/form.html', client=None, action_title="Ajouter un client")
 
 @clients.route('/modifier/<int:client_id>', methods=['GET', 'POST'])
 @login_required
+@role_required('Agent immobilier', 'Assistant')
 def edit_client(client_id):
     client_obj = Client.query.get_or_404(client_id)
     
     if request.method == 'POST':
-        client_obj.nom = request.form.get('nom').upper()
-        client_obj.prenom = request.form.get('prenom').title()
-        client_obj.telephone = request.form.get('telephone')
+        new_telephone = request.form.get('telephone')
+        new_email = request.form.get('email')
+
+        # --- Vérification des doublons (exclure l'enregistrement courant) ---
+        if new_telephone:
+            doublon = Client.query.filter(Client.telephone == new_telephone, Client.id != client_id).first()
+            if doublon:
+                flash(f"⚠️ Doublon détecté : le téléphone <strong>{new_telephone}</strong> est déjà enregistré pour "
+                      f"<a href='{url_for('clients.view_client', client_id=doublon.id)}' class='alert-link'>"
+                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                return render_template('clients/form.html', client=client_obj, action_title=f"Modifier {client_obj.prenom} {client_obj.nom}")
+        if new_email:
+            doublon = Client.query.filter(Client.email == new_email.lower(), Client.id != client_id).first()
+            if doublon:
+                flash(f"⚠️ Doublon détecté : l'e-mail <strong>{new_email}</strong> est déjà enregistré pour "
+                      f"<a href='{url_for('clients.view_client', client_id=doublon.id)}' class='alert-link'>"
+                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                return render_template('clients/form.html', client=client_obj, action_title=f"Modifier {client_obj.prenom} {client_obj.nom}")
+
+        nom_edit = request.form.get('nom', '').strip()
+        prenom_edit = request.form.get('prenom', '').strip()
+        if not nom_edit or not prenom_edit:
+            flash("Le nom et le prénom sont obligatoires.", "danger")
+            return render_template('clients/form.html', client=client_obj, action_title=f"Modifier {client_obj.prenom} {client_obj.nom}")
+        client_obj.nom = nom_edit.upper()
+        client_obj.prenom = prenom_edit.title()
+        client_obj.telephone = new_telephone
         client_obj.telephone_secondaire = request.form.get('telephone_secondaire')
-        client_obj.email = request.form.get('email')
+        client_obj.email = new_email.strip().lower() if new_email else None
         client_obj.adresse = request.form.get('adresse')
         client_obj.ville = request.form.get('ville')
         client_obj.profession = request.form.get('profession')
@@ -112,7 +179,12 @@ def edit_client(client_id):
             return redirect(url_for('clients.view_client', client_id=client_obj.id))
         except Exception as e:
             db.session.rollback()
-            flash("Erreur lors de la modification. Veuillez réessayer.", "danger")
+            logger.error(
+                f"[CLIENTS] Échec modification client id={client_id} "
+                f"par user_id={current_user.id} — {type(e).__name__}: {e}"
+            )
+            logger.error(traceback.format_exc())
+            flash(f"Erreur lors de la modification : {type(e).__name__}. Consultez les logs.", "danger")
             
     return render_template('clients/form.html', client=client_obj, action_title=f"Modifier {client_obj.prenom} {client_obj.nom}")
 
@@ -139,7 +211,12 @@ def delete_client(client_id):
         flash(f"Le client {nom_complet} a été supprimé.", "success")
     except Exception as e:
         db.session.rollback()
-        flash("Impossible de supprimer ce client. Veuillez réessayer.", "danger")
+        logger.error(
+            f"[CLIENTS] Échec suppression client id={client_id} "
+            f"par user_id={current_user.id} — {type(e).__name__}: {e}"
+        )
+        logger.error(traceback.format_exc())
+        flash(f"Impossible de supprimer ce client : {type(e).__name__}. Consultez les logs.", "danger")
         
     return redirect(url_for('clients.list_clients'))
 
@@ -198,8 +275,46 @@ def delete_demande(demande_id):
         
     return redirect(url_for('clients.view_client', client_id=client_id))
 
+@clients.route('/verifier-doublon')
+@login_required
+def verifier_doublon_client():
+    """Route AJAX — vérifie si un téléphone ou email est déjà utilisé par un autre client."""
+    telephone = request.args.get('telephone', '').strip()
+    email = request.args.get('email', '').strip().lower()
+    exclude_id = request.args.get('exclude_id', type=int)  # ID de l'enregistrement en cours de modification
+
+    if telephone:
+        q = Client.query.filter(Client.telephone == telephone)
+        if exclude_id:
+            q = q.filter(Client.id != exclude_id)
+        doublon = q.first()
+        if doublon:
+            return jsonify({
+                'doublon': True,
+                'champ': 'telephone',
+                'nom': f"{doublon.prenom} {doublon.nom}",
+                'url': url_for('clients.view_client', client_id=doublon.id)
+            })
+
+    if email:
+        q = Client.query.filter(Client.email == email)
+        if exclude_id:
+            q = q.filter(Client.id != exclude_id)
+        doublon = q.first()
+        if doublon:
+            return jsonify({
+                'doublon': True,
+                'champ': 'email',
+                'nom': f"{doublon.prenom} {doublon.nom}",
+                'url': url_for('clients.view_client', client_id=doublon.id)
+            })
+
+    return jsonify({'doublon': False})
+
+
 @clients.route('/exporter')
 @login_required
+@role_required('Agent immobilier', 'Assistant')
 def export_clients():
     clients_list = Client.query.order_by(Client.nom.asc()).all()
     excel_file = export_clients_to_excel(clients_list)
@@ -254,7 +369,7 @@ def import_clients():
                 updated_count += 1
             else:
                 count = Client.query.count()
-                code_client = f"CLI-{datetime.utcnow().year}-{count + 1:04d}"
+                code_client = f"CLI-{datetime.now(timezone.utc).year}-{count + 1:04d}"
                 
                 new_client = Client(
                     code_client=code_client,

@@ -36,7 +36,10 @@ def add_user():
             flash('Cet email est déjà utilisé par un autre utilisateur.', 'danger')
             return redirect(url_for('settings.add_user'))
             
-        password = generate_random_password()
+        password = request.form.get('password')
+        if not password:
+            flash('Le mot de passe est obligatoire.', 'danger')
+            return redirect(url_for('settings.add_user'))
         
         user = Utilisateur(
             nom=nom,
@@ -48,14 +51,21 @@ def add_user():
         )
         user.set_password(password)
         
-        db.session.add(user)
-        db.session.commit()
+        # Vérifier la longueur minimale du mot de passe
+        if len(password) < 8:
+            flash('Le mot de passe doit contenir au moins 8 caractères.', 'danger')
+            return redirect(url_for('settings.add_user'))
         
-        log_activity(current_user.id, 'Création', 'utilisateurs', user.id)
-        flash(f'Utilisateur créé avec succès.', 'success')
-        flash(f'Mot de passe temporaire : {password}', 'password')
-        flash('Copiez ce mot de passe maintenant. Il ne sera plus affiché.', 'warning')
-        return redirect(url_for('settings.list_users'))
+        try:
+            db.session.add(user)
+            db.session.commit()
+            log_activity(current_user.id, 'Création', 'utilisateurs', user.id)
+            flash(f'Utilisateur créé avec succès.', 'success')
+            return redirect(url_for('settings.list_users'))
+        except Exception:
+            db.session.rollback()
+            flash('Erreur lors de la création de l\'utilisateur. Veuillez réessayer.', 'danger')
+            return redirect(url_for('settings.add_user'))
         
     return render_template('settings/user_form.html', action="add")
 
@@ -113,15 +123,18 @@ def reset_user_password(id):
         return redirect(url_for('settings.list_users'))
     
     user = Utilisateur.query.get_or_404(id)
-    new_password = generate_random_password()
+    new_password = request.form.get('new_password')
+    
+    if not new_password:
+        flash("Veuillez saisir un nouveau mot de passe.", "danger")
+        return redirect(url_for('settings.list_users'))
+        
     user.set_password(new_password)
     
     try:
         db.session.commit()
         log_activity(current_user.id, f"Réinitialisation mot de passe de {user.prenom} {user.nom}", "utilisateurs", user.id)
-        flash(f"Mot de passe de {user.prenom} {user.nom} réinitialisé.", "success")
-        flash(f"Nouveau mot de passe : {new_password}", "password")
-        flash("Copiez ce mot de passe maintenant. Il ne sera plus affiché.", "warning")
+        flash(f"Le mot de passe de {user.prenom} {user.nom} a été mis à jour avec succès.", "success")
     except Exception as e:
         db.session.rollback()
         flash("Erreur lors de la réinitialisation. Veuillez réessayer.", "danger")

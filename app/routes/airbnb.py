@@ -1,10 +1,10 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
 from flask_login import login_required, current_user
 from app.models import BienAirbnb, ReservationAirbnb, Proprietaire, Utilisateur
-from app.utils.helpers import log_activity, sanitize_search
+from app.utils.helpers import log_activity, sanitize_search, role_required
 from app.services.pdf_service import generate_airbnb_sheet_pdf
 from app import db
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 airbnb = Blueprint('airbnb', __name__)
 
@@ -50,11 +50,12 @@ def list_biens():
 
 @airbnb.route('/ajouter', methods=['GET', 'POST'])
 @login_required
+@role_required('Agent immobilier', 'Assistant')
 def add_bien():
     if request.method == 'POST':
         # Génération de la référence unique
         count = BienAirbnb.query.count()
-        reference = f"AIR-{datetime.utcnow().year}-{count + 1:04d}"
+        reference = f"AIR-{datetime.now(timezone.utc).year}-{count + 1:04d}"
         
         new_bien = BienAirbnb(
             reference=reference,
@@ -97,6 +98,7 @@ def add_bien():
 
 @airbnb.route('/modifier/<int:bien_id>', methods=['GET', 'POST'])
 @login_required
+@role_required('Agent immobilier', 'Assistant')
 def edit_bien(bien_id):
     bien = BienAirbnb.query.get_or_404(bien_id)
     
@@ -176,11 +178,21 @@ def delete_bien(bien_id):
 
 @airbnb.route('/reservation/ajouter/<int:bien_id>', methods=['POST'])
 @login_required
+@role_required('Agent immobilier', 'Assistant')
 def add_reservation(bien_id):
     bien = BienAirbnb.query.get_or_404(bien_id)
     
-    date_arrivee = datetime.strptime(request.form.get('date_arrivee'), '%Y-%m-%d').date()
-    date_depart = datetime.strptime(request.form.get('date_depart'), '%Y-%m-%d').date()
+    try:
+        date_arrivee = datetime.strptime(request.form.get('date_arrivee', ''), '%Y-%m-%d').date()
+        date_depart = datetime.strptime(request.form.get('date_depart', ''), '%Y-%m-%d').date()
+    except ValueError:
+        flash("Format de date invalide pour l'arrivée ou le départ.", "danger")
+        return redirect(url_for('airbnb.view_bien', bien_id=bien_id))
+
+    if date_depart <= date_arrivee:
+        flash("La date de départ doit être postérieure à la date d'arrivée.", "danger")
+        return redirect(url_for('airbnb.view_bien', bien_id=bien_id))
+
     nombre_nuits = (date_depart - date_arrivee).days
     
     montant_total = float(request.form.get('montant_total') or 0)

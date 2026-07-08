@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_login import UserMixin
 from flask_bcrypt import generate_password_hash, check_password_hash
 from app import db, login_manager
@@ -25,7 +25,7 @@ class Utilisateur(db.Model, UserMixin):
     role = db.Column(db.String(50), nullable=False)  # Administrateur, Directeur, Agent immobilier, Assistant, Comptable
     zone_affectation = db.Column(db.String(100))
     actif = db.Column(db.Boolean, default=True)
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relations
     visites = db.relationship('Visite', backref='agent', lazy=True)
@@ -66,7 +66,7 @@ class Client(db.Model):
     devise = db.Column(db.String(10), default='EUR')
     source_client = db.Column(db.String(100))
     observations = db.Column(db.Text)
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relations
     demandes = db.relationship('DemandeClient', backref='client', lazy=True, cascade="all, delete-orphan")
@@ -91,7 +91,7 @@ class DemandeClient(db.Model):
     devise = db.Column(db.String(10), default='EUR')
     statut = db.Column(db.String(30), default='Recherche')  # Recherche, Trouvé, En négociation, Suspension, Conclue
     etat_demande = db.Column(db.String(30), default='Pas urgence')  # Urgence, Pas urgence
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Proprietaire(db.Model):
@@ -105,7 +105,7 @@ class Proprietaire(db.Model):
     adresse = db.Column(db.Text)
     numero_identite = db.Column(db.String(50))
     observations = db.Column(db.Text)
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relations
     proprietes = db.relationship('Propriete', backref='proprietaire', lazy=True)
@@ -136,7 +136,7 @@ class Propriete(db.Model):
     prix = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
     statut = db.Column(db.String(30), default='Disponible')  # Disponible, Réservé, Vendu, Loué, Suspendu
-    date_ajout = db.Column(db.DateTime, default=datetime.utcnow)
+    date_ajout = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relations M2M
     caracteristiques = db.relationship('Caracteristique', secondary=proprietes_caracteristiques, 
@@ -179,7 +179,7 @@ class PhotoPropriete(db.Model):
     propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='CASCADE'), nullable=False)
     chemin_fichier = db.Column(db.Text, nullable=False)
     photo_principale = db.Column(db.Boolean, default=False)
-    date_upload = db.Column(db.DateTime, default=datetime.utcnow)
+    date_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class DocumentPropriete(db.Model):
@@ -190,7 +190,7 @@ class DocumentPropriete(db.Model):
     nom_document = db.Column(db.String(255), nullable=False)
     type_document = db.Column(db.String(100))
     chemin_fichier = db.Column(db.Text, nullable=False)
-    date_upload = db.Column(db.DateTime, default=datetime.utcnow)
+    date_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Visite(db.Model):
@@ -259,7 +259,7 @@ class Commission(db.Model):
     agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='CASCADE'), nullable=False)
     pourcentage = db.Column(db.Numeric(5, 2), nullable=False)
     montant = db.Column(db.Numeric(15, 2), nullable=False)
-    date_calcul = db.Column(db.Date, default=datetime.utcnow)
+    date_calcul = db.Column(db.Date, default=lambda: datetime.now(timezone.utc))
 
 
 class JournalActivite(db.Model):
@@ -270,7 +270,7 @@ class JournalActivite(db.Model):
     action = db.Column(db.String(255), nullable=False)  # Connexion, Création, Modification, Suppression, Export
     table_concernee = db.Column(db.String(100))
     enregistrement_id = db.Column(db.Integer)
-    date_action = db.Column(db.DateTime, default=datetime.utcnow)
+    date_action = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class BienAirbnb(db.Model):
@@ -300,7 +300,7 @@ class BienAirbnb(db.Model):
     climatisation = db.Column(db.Boolean, default=False)
     piscine = db.Column(db.Boolean, default=False)
     observations = db.Column(db.Text)
-    date_ajout = db.Column(db.DateTime, default=datetime.utcnow)
+    date_ajout = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relations
     proprietaire_airbnb = db.relationship('Proprietaire', backref='biens_airbnb', lazy=True)
@@ -329,7 +329,7 @@ class ReservationAirbnb(db.Model):
     montant_net = db.Column(db.Numeric(15, 2))
     statut = db.Column(db.String(30), default='Confirmée')  # Confirmée, En attente, Annulée, Terminée
     observations = db.Column(db.Text)
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f"<ReservationAirbnb {self.nom_voyageur} - {self.date_arrivee}>"
@@ -345,7 +345,7 @@ class CompteBancaire(db.Model):
     titulaire = db.Column(db.String(100))
     solde = db.Column(db.Numeric(15, 2), default=0)
     devise = db.Column(db.String(10), default='EUR')
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     actif = db.Column(db.Boolean, default=True)
 
     # Relations
@@ -363,7 +363,7 @@ class Caisse(db.Model):
     solde = db.Column(db.Numeric(15, 2), default=0)
     devise = db.Column(db.String(10), default='EUR')
     responsable_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     actif = db.Column(db.Boolean, default=True)
 
     # Relations
@@ -381,7 +381,7 @@ class MouvementFinancier(db.Model):
     type_mouvement = db.Column(db.String(20), nullable=False)  # Recette, Dépense, Transfert
     montant = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
-    date_mouvement = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    date_mouvement = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc))
     categorie = db.Column(db.String(100))  # Loyer, Commission, Charge, Salaire, etc.
     description = db.Column(db.Text)
     reference_document = db.Column(db.String(100))
@@ -393,7 +393,7 @@ class MouvementFinancier(db.Model):
     transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='SET NULL'))
     utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
     
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f"<MouvementFinancier {self.type_mouvement} - {self.montant}>"
@@ -406,7 +406,7 @@ class Facture(db.Model):
     numero_facture = db.Column(db.String(50), unique=True, nullable=False)
     client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
     transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='SET NULL'))
-    date_emission = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    date_emission = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc))
     date_echeance = db.Column(db.Date)
     
     montant_ht = db.Column(db.Numeric(15, 2), nullable=False)
@@ -419,7 +419,7 @@ class Facture(db.Model):
     description = db.Column(db.Text)
     fichier_pdf = db.Column(db.Text)
     
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relations
     client_facture = db.relationship('Client', foreign_keys=[client_id])
@@ -439,7 +439,7 @@ class Recu(db.Model):
     facture_id = db.Column(db.Integer, db.ForeignKey('factures.id', ondelete='SET NULL'))
     paiement_id = db.Column(db.Integer, db.ForeignKey('paiements.id', ondelete='SET NULL'))
     
-    date_emission = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    date_emission = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc))
     montant = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
     methode_paiement = db.Column(db.String(50))
@@ -447,7 +447,7 @@ class Recu(db.Model):
     description = db.Column(db.Text)
     fichier_pdf = db.Column(db.Text)
     
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Relations
     client_recu = db.relationship('Client', foreign_keys=[client_id])
@@ -467,7 +467,56 @@ class Budget(db.Model):
     devise = db.Column(db.String(10), default='EUR')
     description = db.Column(db.Text)
     
-    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
         return f"<Budget {self.categorie} {self.annee}>"
+
+
+class Partenaire(db.Model):
+    __tablename__ = 'partenaires'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nom = db.Column(db.String(150), nullable=False)
+    email = db.Column(db.String(150))
+    telephone = db.Column(db.String(30))
+    numero_identification = db.Column(db.String(50))
+    numero_fiscal = db.Column(db.String(50))
+    date_partenariat = db.Column(db.Date)
+    contrat_signe = db.Column(db.Boolean, default=False)
+    date_expiration_contrat = db.Column(db.Date)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # Relations
+    documents = db.relationship('DocumentPartenaire', backref='partenaire', lazy=True, cascade="all, delete-orphan")
+    criteres = db.relationship('CriterePartenaire', backref='partenaire', lazy=True, cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Partenaire {self.nom}>"
+
+
+class CriterePartenaire(db.Model):
+    __tablename__ = 'criteres_partenaires'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    partenaire_id = db.Column(db.Integer, db.ForeignKey('partenaires.id', ondelete='CASCADE'), nullable=False)
+    nom_critere = db.Column(db.String(100), nullable=False)
+    commission = db.Column(db.Numeric(10, 2))
+    devise = db.Column(db.String(10), default='EUR')
+    options_supplementaires = db.Column(db.Text)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def __repr__(self):
+        return f"<CriterePartenaire {self.nom_critere}>"
+
+
+
+class DocumentPartenaire(db.Model):
+    __tablename__ = 'documents_partenaires'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    partenaire_id = db.Column(db.Integer, db.ForeignKey('partenaires.id', ondelete='CASCADE'), nullable=False)
+    nom_document = db.Column(db.String(255), nullable=False)
+    chemin_fichier = db.Column(db.Text, nullable=False)
+    date_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+

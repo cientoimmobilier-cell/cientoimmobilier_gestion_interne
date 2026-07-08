@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action_title }} - Ciento Immobilier{% endblock %}
+{% block header_title %}{{ action_title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+        <div class="card-premium">
+            <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-handshake text-warning me-2"></i>Informations du Partenaire</h5>
+            
+            <form method="POST" action="" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Nom du partenaire (Entreprise ou Personne) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-premium" name="nom" required value="{{ partenaire.nom if partenaire else '' }}">
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Numéro d'identification</label>
+                        <input type="text" class="form-control form-control-premium" name="numero_identification" value="{{ partenaire.numero_identification if partenaire else '' }}">
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Numéro fiscal (si applicable)</label>
+                        <input type="text" class="form-control form-control-premium" name="numero_fiscal" value="{{ partenaire.numero_fiscal if partenaire else '' }}">
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Date de partenariat</label>
+                        <input type="date" class="form-control form-control-premium" name="date_partenariat" value="{{ partenaire.date_partenariat.strftime('%Y-%m-%d') if partenaire and partenaire.date_partenariat else '' }}">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">E-mail de contact</label>
+                        <input type="email" class="form-control form-control-premium" id="email" name="email" value="{{ partenaire.email if partenaire else '' }}">
+                        <div id="doublon-email" class="mt-1" style="display:none;"></div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Téléphone</label>
+                        <input type="text" class="form-control form-control-premium" id="telephone" name="telephone" value="{{ partenaire.telephone if partenaire else '' }}">
+                        <div id="doublon-telephone" class="mt-1" style="display:none;"></div>
+                    </div>
+                    
+                    <div class="col-md-6 d-flex align-items-center">
+                        <div class="form-check form-switch mt-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="contrat_signe" name="contrat_signe" {% if partenaire and partenaire.contrat_signe %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold ms-2" for="contrat_signe">Contrat signé</label>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Date d'expiration du contrat</label>
+                        <input type="date" class="form-control form-control-premium" name="date_expiration_contrat" value="{{ partenaire.date_expiration_contrat.strftime('%Y-%m-%d') if partenaire and partenaire.date_expiration_contrat else '' }}">
+                    </div>
+                </div>
+
+                <hr class="my-4">
+                <h5 class="fw-bold text-dark mb-4"><i class="fa-solid fa-file-contract text-warning me-2"></i>Documents joints</h5>
+                
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Ajouter des documents (PDF, Images, etc.)</label>
+                        <input class="form-control form-control-premium" type="file" name="documents" multiple>
+                        <small class="text-muted">Vous pouvez sélectionner plusieurs fichiers en même temps.</small>
+                    </div>
+                    
+                    {% if partenaire and partenaire.documents %}
+                    <div class="col-12 mt-4">
+                        <label class="form-label fw-semibold">Documents déjà enregistrés :</label>
+                        <ul class="list-group">
+                            {% for doc in partenaire.documents %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fa-solid fa-file text-secondary me-2"></i> {{ doc.nom_document }}
+                                </div>
+                                <span class="badge bg-light text-dark">{{ doc.date_upload.strftime('%d/%m/%Y') }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-5">
+                    <a href="{{ url_for('partenaires.list_partenaires') }}" class="btn btn-outline-secondary rounded-3 px-4">Annuler</a>
+                    <button type="submit" class="btn btn-accent rounded-3 px-5">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const AJAX_URL = "{{ url_for('partenaires.verifier_doublon_partenaire') }}";
+    const EXCLUDE_ID = {{ partenaire.id if partenaire else 'null' }};
+
+    function showDoublon(divId, inputId, data) {
+        const div = document.getElementById(divId);
+        const input = document.getElementById(inputId);
+        if (data.doublon) {
+            div.innerHTML = `<div class="d-flex align-items-center gap-2 p-2 rounded-3" style="background:rgba(220,53,69,0.08);border:1px solid rgba(220,53,69,0.3);">
+                <i class="fa-solid fa-circle-exclamation text-danger"></i>
+                <span style="font-size:0.85rem;"><strong>Doublon détecté :</strong> Ce ${data.champ === 'telephone' ? 'téléphone' : 'e-mail'} appartient déjà à <a href="${data.url}" class="fw-bold text-danger" target="_blank">${data.nom}</a>.</span>
+            </div>`;
+            div.style.display = 'block';
+            input.classList.add('is-invalid');
+        } else {
+            div.innerHTML = `<small class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Aucun doublon trouvé.</small>`;
+            div.style.display = 'block';
+            input.classList.remove('is-invalid');
+            input.classList.add('is-valid');
+            setTimeout(() => { div.style.display = 'none'; input.classList.remove('is-valid'); }, 3000);
+        }
+    }
+
+    function checkField(field, paramName, divId) {
+        const val = field.value.trim();
+        if (!val) return;
+        const params = new URLSearchParams({ [paramName]: val });
+        if (EXCLUDE_ID) params.append('exclude_id', EXCLUDE_ID);
+        fetch(`${AJAX_URL}?${params}`)
+            .then(r => r.json())
+            .then(data => showDoublon(divId, field.id, data))
+            .catch(() => {});
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const telField = document.getElementById('telephone');
+        const emailField = document.getElementById('email');
+        if (telField) telField.addEventListener('blur', () => checkField(telField, 'telephone', 'doublon-telephone'));
+        if (emailField) emailField.addEventListener('blur', () => checkField(emailField, 'email', 'doublon-email'));
+    });
+})();
+</script>
+{% endblock %}

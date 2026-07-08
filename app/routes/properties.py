@@ -4,7 +4,7 @@ from app.models import (Propriete, Proprietaire, Caracteristique, PhotoPropriete
                         DocumentPropriete, Visite, Client, Utilisateur)
 from app.utils.helpers import log_activity, role_required, sanitize_search, safe_path_join
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
 from werkzeug.utils import secure_filename
 import os
 from app.services.excel_service import export_properties_to_excel, import_properties_from_excel
@@ -109,7 +109,7 @@ def add_property():
         
         # Générer la référence unique
         count = Propriete.query.count()
-        reference_bien = f"BIEN-{datetime.utcnow().year}-{count + 1:04d}"
+        reference_bien = f"BIEN-{datetime.now(timezone.utc).year}-{count + 1:04d}"
         
         new_prop = Propriete(
             reference_bien=reference_bien,
@@ -132,7 +132,7 @@ def add_property():
         
         # Associer les caractéristiques
         for c_id in selected_caracs:
-            carac = Caracteristique.query.get(int(c_id))
+            carac = db.session.get(Caracteristique, int(c_id))
             if carac:
                 new_prop.caracteristiques.append(carac)
                 
@@ -177,7 +177,7 @@ def edit_property(property_id):
         selected_caracs = request.form.getlist('caracteristiques')
         prop.caracteristiques = [] # Clear
         for c_id in selected_caracs:
-            carac = Caracteristique.query.get(int(c_id))
+            carac = db.session.get(Caracteristique, int(c_id))
             if carac:
                 prop.caracteristiques.append(carac)
                 
@@ -488,7 +488,7 @@ def import_properties():
         
         for data in properties_data:
             count = Propriete.query.count()
-            reference_bien = f"BIEN-{datetime.utcnow().year}-{count + 1:04d}"
+            reference_bien = f"BIEN-{datetime.now(timezone.utc).year}-{count + 1:04d}"
             
             new_prop = Propriete(
                 reference_bien=reference_bien,

@@ -39,6 +39,16 @@
                         <input type="text" class="form-control form-control-premium" id="zone_affectation" name="zone_affectation" value="{{ agent.zone_affectation if action == 'edit' and agent.zone_affectation else '' }}" placeholder="Ex: Paris Centre, Rive Gauche...">
                     </div>
                 </div>
+                
+                {% if action == 'add' %}
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label for="password" class="form-label fw-semibold">Mot de passe initial</label>
+                        <input type="text" class="form-control form-control-premium" id="password" name="password" required placeholder="Définir le mot de passe">
+                        <div class="form-text">Ce mot de passe permettra à l'agent de se connecter.</div>
+                    </div>
+                </div>
+                {% endif %}
 
                 <div class="d-flex justify-content-end gap-2 border-top pt-4">
                     <a href="{{ url_for('agents.list_agents') }}" class="btn btn-outline-secondary rounded-3">Annuler</a>

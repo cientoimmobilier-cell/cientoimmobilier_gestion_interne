@@ -1,11 +1,11 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, current_app, send_file
 from flask_login import login_required, current_user
 from app.models import Transaction, Client, Propriete, Utilisateur, Commission, Paiement, Contrat
-from app.utils.helpers import log_activity, sanitize_search
+from app.utils.helpers import log_activity, sanitize_search, role_required
 from app import db
 from app.services.pdf_service import generate_transaction_sheet_pdf, generate_payment_receipt_pdf
 from app.services.excel_service import export_transactions_to_excel
-from datetime import datetime
+from datetime import datetime, timezone
 from werkzeug.utils import secure_filename
 import os
 
@@ -18,6 +18,7 @@ def allowed_file(filename):
 
 @transactions.route('/')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def list_transactions():
     search = request.args.get('search', '')
     type_tx = request.args.get('type_transaction', '')
@@ -49,6 +50,7 @@ def list_transactions():
 
 @transactions.route('/ajouter', methods=['GET', 'POST'])
 @login_required
+@role_required('Agent immobilier')
 def add_transaction():
     clients = Client.query.order_by(Client.nom.asc()).all()
     proprietes = Propriete.query.filter_by(statut='Disponible').order_by(Propriete.reference_bien.asc()).all()
@@ -74,7 +76,7 @@ def add_transaction():
             
         # Générer une référence unique
         count = Transaction.query.count()
-        reference_transaction = f"TX-{datetime.utcnow().year}-{count + 1:04d}"
+        reference_transaction = f"TX-{datetime.now(timezone.utc).year}-{count + 1:04d}"
         
         new_tx = Transaction(
             reference_transaction=reference_transaction,
@@ -93,21 +95,22 @@ def add_transaction():
             db.session.add(new_tx)
             db.session.flush() # Récupérer l'ID généré pour la commission
             
-            # Calcul et création de la commission associée
+            # Calcul et création de la commission associée (seulement si agent affecté)
             pct = float(pourcentage_commission)
-            mt_commission = float(montant) * (pct / 100)
-            
-            commission = Commission(
-                transaction_id=new_tx.id,
-                agent_id=agent_id,
-                pourcentage=pct,
-                montant=mt_commission,
-                date_calcul=date_transaction
-            )
-            db.session.add(commission)
+            if agent_id and pct > 0:
+                mt_commission = float(montant) * (pct / 100)
+                
+                commission = Commission(
+                    transaction_id=new_tx.id,
+                    agent_id=agent_id,
+                    pourcentage=pct,
+                    montant=mt_commission,
+                    date_calcul=date_transaction
+                )
+                db.session.add(commission)
             
             # Réserver la propriété (changer son statut en "Réservé")
-            prop = Propriete.query.get(propriete_id)
+            prop = db.session.get(Propriete, propriete_id)
             if prop:
                 prop.statut = 'Réservé'
                 
@@ -128,6 +131,7 @@ def add_transaction():
 
 @transactions.route('/details/<int:tx_id>')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def view_transaction(tx_id):
     tx = Transaction.query.get_or_404(tx_id)
     # Récupérer la commission
@@ -136,6 +140,7 @@ def view_transaction(tx_id):
 
 @transactions.route('/finaliser/<int:tx_id>', methods=['POST'])
 @login_required
+@role_required('Agent immobilier')
 def finalize_transaction(tx_id):
     tx = Transaction.query.get_or_404(tx_id)
     
@@ -190,6 +195,7 @@ def delete_transaction(tx_id):
 
 @transactions.route('/export')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def export_transactions():
     search = request.args.get('search', '')
     type_tx = request.args.get('type_transaction', '')
@@ -216,7 +222,7 @@ def export_transactions():
     
     return send_file(
         output,
-        download_name=f"transactions_{datetime.utcnow().strftime('%Y%m%d')}.xlsx",
+        download_name=f"transactions_{datetime.now(timezone.utc).strftime('%Y%m%d')}.xlsx",
         as_attachment=True,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
@@ -241,12 +247,12 @@ def edit_transaction(tx_id):
         nouveau_propriete_id = request.form.get('propriete_id')
         if int(nouveau_propriete_id) != tx.propriete_id:
             # Libérer l'ancienne propriété
-            ancienne_prop = Propriete.query.get(tx.propriete_id)
+            ancienne_prop = db.session.get(Propriete, tx.propriete_id)
             if ancienne_prop and ancienne_prop.statut in ['Réservé', 'Vendu', 'Loué']:
                 ancienne_prop.statut = 'Disponible'
             
             # Réserver la nouvelle
-            nouvelle_prop = Propriete.query.get(nouveau_propriete_id)
+            nouvelle_prop = db.session.get(Propriete, int(nouveau_propriete_id))
             if nouvelle_prop:
                 nouvelle_prop.statut = 'Réservé'
             
@@ -306,6 +312,7 @@ def edit_transaction(tx_id):
 # --- Ajouter un paiement ---
 @transactions.route('/paiement/ajouter/<int:tx_id>', methods=['POST'])
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def add_payment(tx_id):
     tx = Transaction.query.get_or_404(tx_id)
     montant = request.form.get('montant')
@@ -344,6 +351,7 @@ def add_payment(tx_id):
 # --- Ajouter un contrat PDF ---
 @transactions.route('/contrat/ajouter/<int:tx_id>', methods=['POST'])
 @login_required
+@role_required('Agent immobilier')
 def add_contract(tx_id):
     tx = Transaction.query.get_or_404(tx_id)
     numero_contrat = request.form.get('numero_contrat')
@@ -398,6 +406,7 @@ def add_contract(tx_id):
 
 @transactions.route('/recu/<int:tx_id>')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def download_transaction_pdf(tx_id):
     tx = Transaction.query.get_or_404(tx_id)
     pdf_buffer = generate_transaction_sheet_pdf(tx)
@@ -411,6 +420,7 @@ def download_transaction_pdf(tx_id):
 
 @transactions.route('/paiement/recu/<int:pay_id>')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def download_payment_receipt_pdf_route(pay_id):
     payment = Paiement.query.get_or_404(pay_id)
     pdf_buffer = generate_payment_receipt_pdf(payment)

@@ -29,6 +29,7 @@
                     <div class="col-md-6 mb-3">
                         <label for="telephone" class="form-label fw-semibold" style="font-size: 0.9rem;">Téléphone principal</label>
                         <input type="tel" class="form-control form-control-premium" id="telephone" name="telephone" placeholder="+33 6 12 34 56 78" value="{{ client.telephone if client else '' }}" required>
+                        <div id="doublon-telephone" class="mt-1" style="display:none;"></div>
                     </div>
                     <!-- Téléphone Secondaire -->
                     <div class="col-md-6 mb-3">
@@ -42,6 +43,7 @@
                     <div class="col-md-6 mb-3">
                         <label for="email" class="form-label fw-semibold" style="font-size: 0.9rem;">Adresse e-mail</label>
                         <input type="email" class="form-control form-control-premium" id="email" name="email" placeholder="jean.dupont@exemple.com" value="{{ client.email if client else '' }}">
+                        <div id="doublon-email" class="mt-1" style="display:none;"></div>
                     </div>
                     <!-- Profession -->
                     <div class="col-md-6 mb-3">
@@ -123,4 +125,50 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    const AJAX_URL = "{{ url_for('clients.verifier_doublon_client') }}";
+    const EXCLUDE_ID = {{ client.id if client else 'null' }};
+
+    function showDoublon(divId, inputId, data) {
+        const div = document.getElementById(divId);
+        const input = document.getElementById(inputId);
+        if (data.doublon) {
+            div.innerHTML = `<div class="d-flex align-items-center gap-2 p-2 rounded-3" style="background:rgba(220,53,69,0.08);border:1px solid rgba(220,53,69,0.3);">
+                <i class="fa-solid fa-circle-exclamation text-danger"></i>
+                <span style="font-size:0.85rem;"><strong>Doublon détecté :</strong> Ce ${data.champ === 'telephone' ? 'téléphone' : 'e-mail'} appartient déjà à <a href="${data.url}" class="fw-bold text-danger" target="_blank">${data.nom}</a>.</span>
+            </div>`;
+            div.style.display = 'block';
+            input.classList.add('is-invalid');
+        } else {
+            div.innerHTML = `<small class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Aucun doublon trouvé.</small>`;
+            div.style.display = 'block';
+            input.classList.remove('is-invalid');
+            input.classList.add('is-valid');
+            setTimeout(() => { div.style.display = 'none'; input.classList.remove('is-valid'); }, 3000);
+        }
+    }
+
+    function checkField(field, paramName, divId) {
+        const val = field.value.trim();
+        if (!val) return;
+        const params = new URLSearchParams({ [paramName]: val });
+        if (EXCLUDE_ID) params.append('exclude_id', EXCLUDE_ID);
+        fetch(`${AJAX_URL}?${params}`)
+            .then(r => r.json())
+            .then(data => showDoublon(divId, field.id, data))
+            .catch(() => {});
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const telField = document.getElementById('telephone');
+        const emailField = document.getElementById('email');
+        if (telField) telField.addEventListener('blur', () => checkField(telField, 'telephone', 'doublon-telephone'));
+        if (emailField) emailField.addEventListener('blur', () => checkField(emailField, 'email', 'doublon-email'));
+    });
+})();
+</script>
 {% endblock %}

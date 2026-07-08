@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
+from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file, jsonify
 from flask_login import login_required, current_user
 from app.models import Proprietaire, Propriete
-from app.utils.helpers import log_activity, sanitize_search
+from app.utils.helpers import log_activity, sanitize_search, role_required
 from app import db
 from datetime import datetime
 from app.services.excel_service import export_owners_to_excel, import_owners_from_excel
@@ -28,6 +28,7 @@ def list_owners():
 
 @owners.route('/ajouter', methods=['GET', 'POST'])
 @login_required
+@role_required('Agent immobilier', 'Assistant')
 def add_owner():
     if request.method == 'POST':
         nom = request.form.get('nom')
@@ -38,11 +39,35 @@ def add_owner():
         numero_identite = request.form.get('numero_identite')
         observations = request.form.get('observations')
         
+        # --- Vérification des doublons ---
+        if telephone:
+            doublon = Proprietaire.query.filter(Proprietaire.telephone == telephone).first()
+            if doublon:
+                flash(f"⚠️ Doublon détecté : le téléphone <strong>{telephone}</strong> est déjà enregistré pour "
+                      f"<a href='{url_for('owners.view_owner', owner_id=doublon.id)}' class='alert-link'>"
+                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                return render_template('owners/form.html', owner=None, action_title="Ajouter un propriétaire")
+        if email:
+            doublon = Proprietaire.query.filter(Proprietaire.email == email.lower()).first()
+            if doublon:
+                flash(f"⚠️ Doublon détecté : l'e-mail <strong>{email}</strong> est déjà enregistré pour "
+                      f"<a href='{url_for('owners.view_owner', owner_id=doublon.id)}' class='alert-link'>"
+                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                return render_template('owners/form.html', owner=None, action_title="Ajouter un propriétaire")
+
+        # Validation des champs obligatoires
+        if not nom or not nom.strip():
+            flash("Le nom de famille est obligatoire.", "danger")
+            return render_template('owners/form.html', owner=None, action_title="Ajouter un propriétaire")
+        if not prenom or not prenom.strip():
+            flash("Le prénom est obligatoire.", "danger")
+            return render_template('owners/form.html', owner=None, action_title="Ajouter un propriétaire")
+
         new_owner = Proprietaire(
-            nom=nom.upper(),
-            prenom=prenom.title(),
+            nom=nom.strip().upper(),
+            prenom=prenom.strip().title(),
             telephone=telephone,
-            email=email,
+            email=email.strip().lower() if email else None,
             adresse=adresse,
             numero_identite=numero_identite,
             observations=observations
@@ -62,14 +87,39 @@ def add_owner():
 
 @owners.route('/modifier/<int:owner_id>', methods=['GET', 'POST'])
 @login_required
+@role_required('Agent immobilier', 'Assistant')
 def edit_owner(owner_id):
     owner_obj = Proprietaire.query.get_or_404(owner_id)
     
     if request.method == 'POST':
-        owner_obj.nom = request.form.get('nom').upper()
-        owner_obj.prenom = request.form.get('prenom').title()
-        owner_obj.telephone = request.form.get('telephone')
-        owner_obj.email = request.form.get('email')
+        new_telephone = request.form.get('telephone')
+        new_email = request.form.get('email')
+
+        # --- Vérification des doublons (exclure l'enregistrement courant) ---
+        if new_telephone:
+            doublon = Proprietaire.query.filter(Proprietaire.telephone == new_telephone, Proprietaire.id != owner_id).first()
+            if doublon:
+                flash(f"⚠️ Doublon détecté : le téléphone <strong>{new_telephone}</strong> est déjà enregistré pour "
+                      f"<a href='{url_for('owners.view_owner', owner_id=doublon.id)}' class='alert-link'>"
+                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                return render_template('owners/form.html', owner=owner_obj, action_title=f"Modifier {owner_obj.prenom} {owner_obj.nom}")
+        if new_email:
+            doublon = Proprietaire.query.filter(Proprietaire.email == new_email.lower(), Proprietaire.id != owner_id).first()
+            if doublon:
+                flash(f"⚠️ Doublon détecté : l'e-mail <strong>{new_email}</strong> est déjà enregistré pour "
+                      f"<a href='{url_for('owners.view_owner', owner_id=doublon.id)}' class='alert-link'>"
+                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                return render_template('owners/form.html', owner=owner_obj, action_title=f"Modifier {owner_obj.prenom} {owner_obj.nom}")
+
+        nom_edit = request.form.get('nom', '').strip()
+        prenom_edit = request.form.get('prenom', '').strip()
+        if not nom_edit or not prenom_edit:
+            flash("Le nom et le prénom sont obligatoires.", "danger")
+            return render_template('owners/form.html', owner=owner_obj, action_title=f"Modifier {owner_obj.prenom} {owner_obj.nom}")
+        owner_obj.nom = nom_edit.upper()
+        owner_obj.prenom = prenom_edit.title()
+        owner_obj.telephone = new_telephone
+        owner_obj.email = new_email.strip().lower() if new_email else None
         owner_obj.adresse = request.form.get('adresse')
         owner_obj.numero_identite = request.form.get('numero_identite')
         owner_obj.observations = request.form.get('observations')
@@ -111,8 +161,47 @@ def delete_owner(owner_id):
         
     return redirect(url_for('owners.list_owners'))
 
+
+@owners.route('/verifier-doublon')
+@login_required
+def verifier_doublon_owner():
+    """Route AJAX — vérifie si un téléphone ou email est déjà utilisé par un autre propriétaire."""
+    telephone = request.args.get('telephone', '').strip()
+    email = request.args.get('email', '').strip().lower()
+    exclude_id = request.args.get('exclude_id', type=int)
+
+    if telephone:
+        q = Proprietaire.query.filter(Proprietaire.telephone == telephone)
+        if exclude_id:
+            q = q.filter(Proprietaire.id != exclude_id)
+        doublon = q.first()
+        if doublon:
+            return jsonify({
+                'doublon': True,
+                'champ': 'telephone',
+                'nom': f"{doublon.prenom} {doublon.nom}",
+                'url': url_for('owners.view_owner', owner_id=doublon.id)
+            })
+
+    if email:
+        q = Proprietaire.query.filter(Proprietaire.email == email)
+        if exclude_id:
+            q = q.filter(Proprietaire.id != exclude_id)
+        doublon = q.first()
+        if doublon:
+            return jsonify({
+                'doublon': True,
+                'champ': 'email',
+                'nom': f"{doublon.prenom} {doublon.nom}",
+                'url': url_for('owners.view_owner', owner_id=doublon.id)
+            })
+
+    return jsonify({'doublon': False})
+
+
 @owners.route('/exporter')
 @login_required
+@role_required('Agent immobilier', 'Assistant')
 def export_owners():
     owners_list = Proprietaire.query.order_by(Proprietaire.nom.asc()).all()
     excel_file = export_owners_to_excel(owners_list)

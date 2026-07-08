@@ -57,21 +57,18 @@
                                 <i class="fa-solid fa-pen"></i>
                             </a>
                             {% if current_user.id != user.id %}
-                            <form action="{{ url_for('settings.reset_user_password', id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Réinitialiser le mot de passe de {{ user.prenom }} {{ user.nom }} ? Un nouveau mot de passe sera généré.');">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm btn-outline-warning rounded-3" title="Réinitialiser le mot de passe">
-                                    <i class="fa-solid fa-key"></i>
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-warning rounded-3" title="Définir un nouveau mot de passe" data-bs-toggle="modal" data-bs-target="#resetPasswordModal{{ user.id }}">
+                                <i class="fa-solid fa-key"></i>
+                            </button>
                             <form action="{{ url_for('settings.delete_user', id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Voulez-vous vraiment supprimer cet utilisateur ? Cette action est irréversible.');">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </form>
                             {% endif %}
                         </div>
-                        </td>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
@@ -82,4 +79,35 @@
         </table>
     </div>
 </div>
+
+<!-- Modals outside the table -->
+{% for user in users %}
+{% if current_user.id != user.id %}
+<!-- Modal Reset Password -->
+<div class="modal fade" id="resetPasswordModal{{ user.id }}" tabindex="-1" aria-labelledby="resetPasswordModalLabel{{ user.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered text-start">
+        <div class="modal-content border-0 rounded-4 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="resetPasswordModalLabel{{ user.id }}">Nouveau mot de passe pour {{ user.prenom }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('settings.reset_user_password', id=user.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="new_password_{{ user.id }}" class="form-label fw-semibold">Mot de passe</label>
+                        <input type="text" class="form-control" id="new_password_{{ user.id }}" name="new_password" required placeholder="Saisir le nouveau mot de passe">
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-warning rounded-3">Définir le mot de passe</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
 {% endblock %}

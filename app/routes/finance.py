@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import login_required, current_user
 from app import db
 from app.models import CompteBancaire, Caisse, MouvementFinancier, Facture, Recu, Budget, Utilisateur, Client, Transaction
-from datetime import datetime
+from datetime import datetime, timezone
 from app.utils.helpers import log_activity, role_required
 import re
 
@@ -23,6 +23,7 @@ def sanitize_text(value, max_length=500):
 
 @finance.route('/')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def index():
     # Affichage du tableau de bord financier
     comptes = CompteBancaire.query.filter_by(actif=True).all()
@@ -33,7 +34,7 @@ def index():
     total_caisse = sum(caisse.solde for caisse in caisses) if caisses else 0
     
     # Calculs journaliers et mensuels
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     current_month = today.month
     current_year = today.year
     
@@ -58,6 +59,7 @@ def index():
 
 @finance.route('/recettes')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def recettes():
     mouvements = MouvementFinancier.query.filter_by(type_mouvement='Recette').order_by(MouvementFinancier.date_mouvement.desc()).all()
     caisses = Caisse.query.filter_by(actif=True).all()
@@ -66,6 +68,7 @@ def recettes():
 
 @finance.route('/depenses')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def depenses():
     mouvements = MouvementFinancier.query.filter_by(type_mouvement='Dépense').order_by(MouvementFinancier.date_mouvement.desc()).all()
     caisses = Caisse.query.filter_by(actif=True).all()
@@ -74,6 +77,7 @@ def depenses():
 
 @finance.route('/caisse')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def caisse():
     caisses = Caisse.query.filter_by(actif=True).all()
     mouvements = MouvementFinancier.query.filter(MouvementFinancier.caisse_id.isnot(None)).order_by(MouvementFinancier.date_mouvement.desc()).limit(50).all()
@@ -81,6 +85,7 @@ def caisse():
 
 @finance.route('/banque')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def banque():
     comptes = CompteBancaire.query.filter_by(actif=True).all()
     mouvements = MouvementFinancier.query.filter(MouvementFinancier.compte_bancaire_id.isnot(None)).order_by(MouvementFinancier.date_mouvement.desc()).limit(50).all()
@@ -88,6 +93,7 @@ def banque():
 
 @finance.route('/factures')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def factures():
     factures = Facture.query.order_by(Facture.date_emission.desc()).all()
     clients = Client.query.order_by(Client.nom.asc()).all()
@@ -95,6 +101,7 @@ def factures():
 
 @finance.route('/recus')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def recus():
     recus = Recu.query.order_by(Recu.date_emission.desc()).all()
     clients = Client.query.order_by(Client.nom.asc()).all()
@@ -102,6 +109,7 @@ def recus():
 
 @finance.route('/budgets')
 @login_required
+@role_required('Comptable', 'Agent immobilier')
 def budgets():
     budgets = Budget.query.order_by(Budget.annee.desc(), Budget.mois.desc()).all()
     return render_template('finance/budgets.html', budgets=budgets)
@@ -136,7 +144,7 @@ def add_mouvement():
     try:
         date_mvt = datetime.strptime(date_mvt_str, "%Y-%m-%d").date()
     except Exception:
-        date_mvt = datetime.utcnow().date()
+        date_mvt = datetime.now(timezone.utc).date()
         
     mvt = MouvementFinancier(
         type_mouvement=type_mouvement,
@@ -156,14 +164,14 @@ def add_mouvement():
         
         # Mettre à jour le solde
         if compte_bancaire_id:
-            compte = CompteBancaire.query.get(compte_bancaire_id)
+            compte = db.session.get(CompteBancaire, int(compte_bancaire_id))
             if compte:
                 if type_mouvement == 'Recette':
                     compte.solde += montant
                 elif type_mouvement == 'Dépense':
                     compte.solde -= montant
         elif caisse_id:
-            caisse = Caisse.query.get(caisse_id)
+            caisse = db.session.get(Caisse, int(caisse_id))
             if caisse:
                 if type_mouvement == 'Recette':
                     caisse.solde += montant

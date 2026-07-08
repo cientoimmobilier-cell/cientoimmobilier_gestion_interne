@@ -132,8 +132,8 @@ def change_password():
             log_activity(current_user.id, "Changement de mot de passe")
             flash("Votre mot de passe a été modifié avec succès.", "success")
             return redirect(url_for('dashboard.index'))
-        except Exception as e:
+        except Exception:
             db.session.rollback()
-            flash(f"Erreur lors du changement de mot de passe : {e}", "danger")
+            flash("Erreur lors du changement de mot de passe. Veuillez réessayer.", "danger")
     
     return render_template('auth/change_password.html')

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Partenaires - Ciento Immobilier{% endblock %}
+{% block header_title %}Partenaires{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card-premium">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-handshake text-warning me-2"></i>Liste des partenaires</h5>
+                
+                <div class="d-flex flex-wrap gap-2">
+                    <!-- Barre de recherche -->
+                    <form method="GET" action="{{ url_for('partenaires.list_partenaires') }}" class="d-flex align-items-center">
+                        <div class="input-group">
+                            <input type="text" name="search" class="form-control form-control-premium" placeholder="Nom, ID, e-mail..." value="{{ search }}">
+                            <button class="btn btn-premium border-start-0 rounded-end-3" type="submit"><i class="fa-solid fa-search"></i></button>
+                        </div>
+                        {% if search %}
+                        <a href="{{ url_for('partenaires.list_partenaires') }}" class="btn btn-outline-secondary ms-2 border-0 rounded-circle"><i class="fa-solid fa-times"></i></a>
+                        {% endif %}
+                    </form>
+                    
+                    <a href="{{ url_for('partenaires.add_partenaire') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Nouveau partenaire</a>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>N° Identification</th>
+                            <th>N° Fiscal</th>
+                            <th>Date Partenariat</th>
+                            <th>Contrat Signé</th>
+                            <th>Expiration Contrat</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for partenaire in partenaires %}
+                        <tr>
+                            <td>
+                                <span class="fw-semibold text-dark">{{ partenaire.nom }}</span>
+                                {% if partenaire.email %}
+                                <br><small class="text-muted"><i class="fa-regular fa-envelope me-1"></i>{{ partenaire.email }}</small>
+                                {% endif %}
+                                {% if partenaire.telephone %}
+                                <br><small class="text-muted"><i class="fa-solid fa-phone me-1"></i>{{ partenaire.telephone }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ partenaire.numero_identification or 'N/A' }}</td>
+                            <td>{{ partenaire.numero_fiscal or 'N/A' }}</td>
+                            <td>{{ partenaire.date_partenariat.strftime('%d/%m/%Y') if partenaire.date_partenariat else 'N/A' }}</td>
+                            <td>
+                                {% if partenaire.contrat_signe %}
+                                <span class="badge bg-success rounded-pill"><i class="fa-solid fa-check me-1"></i>Oui</span>
+                                {% else %}
+                                <span class="badge bg-danger rounded-pill"><i class="fa-solid fa-xmark me-1"></i>Non</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ partenaire.date_expiration_contrat.strftime('%d/%m/%Y') if partenaire.date_expiration_contrat else 'N/A' }}</td>
+                            <td class="text-end">
+                                <a href="{{ url_for('partenaires.view_partenaire', id=partenaire.id) }}" class="btn btn-sm btn-outline-primary rounded-3 me-1" title="Voir les détails"><i class="fa-solid fa-eye"></i></a>
+                                <a href="{{ url_for('partenaires.edit_partenaire', id=partenaire.id) }}" class="btn btn-sm btn-outline-secondary rounded-3 me-1" title="Modifier"><i class="fa-solid fa-pen"></i></a>
+                                {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                                <form action="{{ url_for('partenaires.delete_partenaire', id=partenaire.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce partenaire ? Tous ses documents seront également supprimés.');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">Aucun partenaire trouvé.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
