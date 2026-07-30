@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from '_search_filters.html' import sort_link, search_form %}
+{% from '_pagination.html' import render_pagination %}
 
 {% block title %}Agents Externes - Ciento Immobilier{% endblock %}
 {% block header_title %}Agents Externes{% endblock %}
@@ -37,6 +39,8 @@
         </div>
     </form>
 </div>
+
+{{ search_form('agents.list_agents', placeholder='Rechercher un agent...') }}
 
 <!-- Liste des agents sous forme de cartes -->
 <div class="row">
@@ -133,4 +137,6 @@
     </div>
     {% endfor %}
 </div>
+
+{{ render_pagination(pagination, 'agents.list_agents') }}
 {% endblock %}

@@ -68,7 +68,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function() {
     const AJAX_URL = "{{ url_for('owners.verifier_doublon_owner') }}";
     const EXCLUDE_ID = {{ owner.id if owner else 'null' }};

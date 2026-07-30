@@ -1,4 +1,5 @@
 import unittest
+from sqlalchemy import select
 from app import create_app, db
 from config import Config
 from app.models import Utilisateur, Client, Propriete, Transaction, Commission
@@ -43,7 +44,7 @@ class CientoImmobilierTestCase(unittest.TestCase):
         db.session.add(client)
         db.session.commit()
         
-        queried = Client.query.filter_by(code_client='CLI-2026-0001').first()
+        queried = db.session.execute(select(Client).where(Client.code_client == 'CLI-2026-0001')).scalars().first()
         self.assertIsNotNone(queried)
         self.assertEqual(queried.nom, 'MARTIN')
         self.assertEqual(queried.prenom, 'Thomas')
@@ -61,7 +62,7 @@ class CientoImmobilierTestCase(unittest.TestCase):
         db.session.add(prop)
         db.session.commit()
         
-        queried = Propriete.query.filter_by(reference_bien='BIEN-2026-0001').first()
+        queried = db.session.execute(select(Propriete).where(Propriete.reference_bien == 'BIEN-2026-0001')).scalars().first()
         self.assertIsNotNone(queried)
         self.assertEqual(queried.prix, 250000)
         self.assertEqual(queried.statut, 'Disponible')
@@ -113,7 +114,7 @@ class CientoImmobilierTestCase(unittest.TestCase):
         db.session.add(commission)
         db.session.commit()
         
-        queried_commission = Commission.query.filter_by(transaction_id=tx.id).first()
+        queried_commission = db.session.execute(select(Commission).where(Commission.transaction_id == tx.id)).scalars().first()
         self.assertIsNotNone(queried_commission)
         self.assertEqual(float(queried_commission.montant), 5000.0)
         self.assertEqual(float(queried_commission.pourcentage), 5.0)

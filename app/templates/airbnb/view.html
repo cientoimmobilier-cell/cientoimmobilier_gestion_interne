@@ -106,7 +106,7 @@
                 </a>
                 <a href="{{ url_for('airbnb.edit_bien', bien_id=bien.id) }}" class="btn btn-premium w-100 rounded-3"><i class="fa-solid fa-pen-to-square me-2"></i>Modifier</a>
                 {% if current_user.role in ['Administrateur', 'Directeur'] %}
-                <form action="{{ url_for('airbnb.delete_bien', bien_id=bien.id) }}" method="POST" onsubmit="return confirm('Supprimer ce bien et toutes ses réservations ?');">
+                <form action="{{ url_for('airbnb.delete_bien', bien_id=bien.id) }}" method="POST" data-confirm="Supprimer ce bien et toutes ses réservations ?">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-danger w-100 rounded-3"><i class="fa-solid fa-trash-can me-2"></i>Supprimer</button>
                 </form>
@@ -190,7 +190,7 @@
                                 </span>
                             </td>
                             <td class="text-end">
-                                <form action="{{ url_for('airbnb.delete_reservation', reservation_id=res.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Supprimer cette réservation ?');">
+                                <form action="{{ url_for('airbnb.delete_reservation', reservation_id=res.id) }}" method="POST" class="d-inline" data-confirm="Supprimer cette réservation ?">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle"><i class="fa-solid fa-times"></i></button>
                                 </form>

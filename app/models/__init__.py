@@ -1,17 +1,21 @@
 from datetime import datetime, timezone
-from flask_login import UserMixin
+
 from flask_bcrypt import generate_password_hash, check_password_hash
+from flask_login import UserMixin
+from sqlalchemy import select
+
 from app import db, login_manager
 
 @login_manager.user_loader
 def load_user(user_id):
-    return Utilisateur.query.get(int(user_id))
+    return db.session.get(Utilisateur, int(user_id))
 
 # Table d'association pour les caractéristiques des propriétés
 proprietes_caracteristiques = db.Table('proprietes_caracteristiques',
     db.Column('propriete_id', db.Integer, db.ForeignKey('proprietes.id', ondelete='CASCADE'), primary_key=True),
     db.Column('caracteristique_id', db.Integer, db.ForeignKey('caracteristiques.id', ondelete='CASCADE'), primary_key=True)
 )
+
 
 class Utilisateur(db.Model, UserMixin):
     __tablename__ = 'utilisateurs'
@@ -22,9 +26,9 @@ class Utilisateur(db.Model, UserMixin):
     email = db.Column(db.String(150), unique=True, nullable=False)
     telephone = db.Column(db.String(30))
     mot_de_passe_hash = db.Column(db.Text, nullable=False)
-    role = db.Column(db.String(50), nullable=False)  # Administrateur, Directeur, Agent immobilier, Assistant, Comptable
+    role = db.Column(db.String(50), nullable=False, index=True)  # Administrateur, Directeur, Agent immobilier, Assistant, Comptable
     zone_affectation = db.Column(db.String(100))
-    actif = db.Column(db.Boolean, default=True)
+    actif = db.Column(db.Boolean, default=True, index=True)
     date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relations
@@ -43,7 +47,7 @@ class Utilisateur(db.Model, UserMixin):
         return self.actif
 
     def __repr__(self):
-        return f"<Utilisateur {self.prenom} {self.nom} - {self.role}>"
+        return f'<Utilisateur {self.prenom} {self.nom} - {self.role}>'
 
 
 class Client(db.Model):
@@ -51,15 +55,17 @@ class Client(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     code_client = db.Column(db.String(20), unique=True)
-    nom = db.Column(db.String(100), nullable=False)
+    nom = db.Column(db.String(100), nullable=False, index=True)
     prenom = db.Column(db.String(100))
-    telephone = db.Column(db.String(30))
+    telephone = db.Column(db.String(30), index=True)
     telephone_secondaire = db.Column(db.String(30))
-    email = db.Column(db.String(150))
+    email = db.Column(db.String(150), index=True)
     adresse = db.Column(db.Text)
     ville = db.Column(db.String(100))
     profession = db.Column(db.String(100))
     zone_ciblee = db.Column(db.String(200))
+    numero_identite = db.Column(db.String(50))
+    type_piece = db.Column(db.String(30))
     description = db.Column(db.Text)
     budget_min = db.Column(db.Numeric(15, 2))
     budget_max = db.Column(db.Numeric(15, 2))
@@ -74,7 +80,7 @@ class Client(db.Model):
     transactions = db.relationship('Transaction', backref='client', lazy=True)
 
     def __repr__(self):
-        return f"<Client {self.prenom} {self.nom}>"
+        return f'<Client {self.prenom} {self.nom}>'
 
 
 class DemandeClient(db.Model):
@@ -98,10 +104,10 @@ class Proprietaire(db.Model):
     __tablename__ = 'proprietaires'
     
     id = db.Column(db.Integer, primary_key=True)
-    nom = db.Column(db.String(100), nullable=False)
+    nom = db.Column(db.String(100), nullable=False, index=True)
     prenom = db.Column(db.String(100))
-    telephone = db.Column(db.String(30))
-    email = db.Column(db.String(150))
+    telephone = db.Column(db.String(30), index=True)
+    email = db.Column(db.String(150), index=True)
     adresse = db.Column(db.Text)
     numero_identite = db.Column(db.String(50))
     observations = db.Column(db.Text)
@@ -111,7 +117,7 @@ class Proprietaire(db.Model):
     proprietes = db.relationship('Propriete', backref='proprietaire', lazy=True)
 
     def __repr__(self):
-        return f"<Proprietaire {self.prenom} {self.nom}>"
+        return f'<Proprietaire {self.prenom} {self.nom}>'
 
 
 class Propriete(db.Model):
@@ -122,10 +128,10 @@ class Propriete(db.Model):
     proprietaire_id = db.Column(db.Integer, db.ForeignKey('proprietaires.id', ondelete='SET NULL'))
     titre = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
-    type_bien = db.Column(db.String(50), nullable=False)  # Maison, Appartement, Terrain, Villa, Bureau, Local commercial, Entrepôt, Immeuble
+    type_bien = db.Column(db.String(50), nullable=False, index=True)  # Maison, Appartement, Terrain, Villa, Bureau, Local commercial, Entrepôt, Immeuble
     type_operation = db.Column(db.String(20), nullable=False)  # Vente, Location
     adresse = db.Column(db.Text)
-    ville = db.Column(db.String(100))
+    ville = db.Column(db.String(100), index=True)
     quartier = db.Column(db.String(100))
     latitude = db.Column(db.Numeric(10, 7))
     longitude = db.Column(db.Numeric(10, 7))
@@ -135,7 +141,7 @@ class Propriete(db.Model):
     nombre_garages = db.Column(db.Integer)
     prix = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
-    statut = db.Column(db.String(30), default='Disponible')  # Disponible, Réservé, Vendu, Loué, Suspendu
+    statut = db.Column(db.String(30), default='Disponible', index=True)  # Disponible, Réservé, Vendu, Loué, Suspendu
     date_ajout = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relations M2M
@@ -149,17 +155,17 @@ class Propriete(db.Model):
     transactions = db.relationship('Transaction', backref='propriete', lazy=True)
 
     def get_main_photo(self):
-        main_photo = PhotoPropriete.query.filter_by(propriete_id=self.id, photo_principale=True).first()
+        main_photo = db.session.execute(select(PhotoPropriete).where(PhotoPropriete.propriete_id == self.id, PhotoPropriete.photo_principale == True)).scalars().first()
         if main_photo:
             return main_photo.chemin_fichier
         # Retourner la première photo si pas de photo principale spécifiée
-        first_photo = PhotoPropriete.query.filter_by(propriete_id=self.id).first()
+        first_photo = db.session.execute(select(PhotoPropriete).where(PhotoPropriete.propriete_id == self.id)).scalars().first()
         if first_photo:
             return first_photo.chemin_fichier
         return 'img/placeholder-property.jpg'
 
     def __repr__(self):
-        return f"<Propriete {self.reference_bien} - {self.titre}>"
+        return f'<Propriete {self.reference_bien} - {self.titre}>'
 
 
 class Caracteristique(db.Model):
@@ -169,7 +175,7 @@ class Caracteristique(db.Model):
     nom = db.Column(db.String(100), unique=True, nullable=False)
 
     def __repr__(self):
-        return f"<Caracteristique {self.nom}>"
+        return f'<Caracteristique {self.nom}>'
 
 
 class PhotoPropriete(db.Model):
@@ -213,11 +219,11 @@ class Transaction(db.Model):
     client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
     propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='SET NULL'))
     agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
-    type_transaction = db.Column(db.String(20), nullable=False)  # Vente, Location
+    type_transaction = db.Column(db.String(20), nullable=False, index=True)  # Vente, Location
     montant = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
-    date_transaction = db.Column(db.Date, nullable=False)
-    statut = db.Column(db.String(30), default='En cours')  # En cours, Finalisée, Annulée
+    date_transaction = db.Column(db.Date, nullable=False, index=True)
+    statut = db.Column(db.String(30), default='En cours', index=True)  # En cours, Finalisée, Annulée
     observations = db.Column(db.Text)
     
     # Relations 1-M
@@ -235,6 +241,11 @@ class Contrat(db.Model):
     date_signature = db.Column(db.Date, nullable=False)
     date_debut = db.Column(db.Date)
     date_fin = db.Column(db.Date)
+    montant_loyer = db.Column(db.Numeric(15, 2))
+    depot_garantie = db.Column(db.Numeric(15, 2))
+    mode_paiement = db.Column(db.String(50))
+    frequence = db.Column(db.String(30))
+    statut = db.Column(db.String(30), default='Actif')
     fichier_pdf = db.Column(db.Text)
 
 
@@ -293,7 +304,7 @@ class BienAirbnb(db.Model):
     frais_menage = db.Column(db.Numeric(15, 2), default=0)
     proprietaire_id = db.Column(db.Integer, db.ForeignKey('proprietaires.id', ondelete='SET NULL'))
     agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
-    statut = db.Column(db.String(30), default='Actif')  # Actif, Inactif, En maintenance
+    statut = db.Column(db.String(30), default='Actif', index=True)  # Actif, Inactif, En maintenance
     lien_airbnb = db.Column(db.Text)
     wifi = db.Column(db.Boolean, default=False)
     parking = db.Column(db.Boolean, default=False)
@@ -308,7 +319,7 @@ class BienAirbnb(db.Model):
     reservations = db.relationship('ReservationAirbnb', backref='bien_airbnb', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<BienAirbnb {self.reference} - {self.titre}>"
+        return f'<BienAirbnb {self.reference} - {self.titre}>'
 
 
 class ReservationAirbnb(db.Model):
@@ -320,19 +331,19 @@ class ReservationAirbnb(db.Model):
     telephone_voyageur = db.Column(db.String(30))
     email_voyageur = db.Column(db.String(150))
     nombre_voyageurs = db.Column(db.Integer, default=1)
-    date_arrivee = db.Column(db.Date, nullable=False)
+    date_arrivee = db.Column(db.Date, nullable=False, index=True)
     date_depart = db.Column(db.Date, nullable=False)
     nombre_nuits = db.Column(db.Integer)
     montant_total = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
     commission_airbnb = db.Column(db.Numeric(15, 2), default=0)
     montant_net = db.Column(db.Numeric(15, 2))
-    statut = db.Column(db.String(30), default='Confirmée')  # Confirmée, En attente, Annulée, Terminée
+    statut = db.Column(db.String(30), default='Confirmée', index=True)  # Confirmée, En attente, Annulée, Terminée
     observations = db.Column(db.Text)
     date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
-        return f"<ReservationAirbnb {self.nom_voyageur} - {self.date_arrivee}>"
+        return f'<ReservationAirbnb {self.nom_voyageur} - {self.date_arrivee}>'
 
 # --- MODULE GESTION FINANCIERE ---
 
@@ -352,7 +363,7 @@ class CompteBancaire(db.Model):
     mouvements = db.relationship('MouvementFinancier', backref='compte_bancaire', lazy=True)
 
     def __repr__(self):
-        return f"<CompteBancaire {self.nom_banque} - {self.numero_compte}>"
+        return f'<CompteBancaire {self.nom_banque} - {self.numero_compte}>'
 
 
 class Caisse(db.Model):
@@ -371,17 +382,17 @@ class Caisse(db.Model):
     responsable = db.relationship('Utilisateur', foreign_keys=[responsable_id])
 
     def __repr__(self):
-        return f"<Caisse {self.nom}>"
+        return f'<Caisse {self.nom}>'
 
 
 class MouvementFinancier(db.Model):
     __tablename__ = 'mouvements_financiers'
     
     id = db.Column(db.Integer, primary_key=True)
-    type_mouvement = db.Column(db.String(20), nullable=False)  # Recette, Dépense, Transfert
+    type_mouvement = db.Column(db.String(20), nullable=False, index=True)  # Recette, Dépense, Transfert
     montant = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
-    date_mouvement = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc))
+    date_mouvement = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     categorie = db.Column(db.String(100))  # Loyer, Commission, Charge, Salaire, etc.
     description = db.Column(db.Text)
     reference_document = db.Column(db.String(100))
@@ -396,7 +407,7 @@ class MouvementFinancier(db.Model):
     date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
-        return f"<MouvementFinancier {self.type_mouvement} - {self.montant}>"
+        return f'<MouvementFinancier {self.type_mouvement} - {self.montant}>'
 
 
 class Facture(db.Model):
@@ -406,7 +417,7 @@ class Facture(db.Model):
     numero_facture = db.Column(db.String(50), unique=True, nullable=False)
     client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
     transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='SET NULL'))
-    date_emission = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc))
+    date_emission = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     date_echeance = db.Column(db.Date)
     
     montant_ht = db.Column(db.Numeric(15, 2), nullable=False)
@@ -415,7 +426,7 @@ class Facture(db.Model):
     montant_ttc = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
     
-    statut = db.Column(db.String(30), default='Brouillon')  # Brouillon, Émise, Payée, Partiellement Payée, Annulée
+    statut = db.Column(db.String(30), default='Brouillon', index=True)  # Brouillon, Émise, Payée, Partiellement Payée, Annulée
     description = db.Column(db.Text)
     fichier_pdf = db.Column(db.Text)
     
@@ -427,7 +438,7 @@ class Facture(db.Model):
     recus = db.relationship('Recu', backref='facture', lazy=True)
 
     def __repr__(self):
-        return f"<Facture {self.numero_facture}>"
+        return f'<Facture {self.numero_facture}>'
 
 
 class Recu(db.Model):
@@ -453,7 +464,7 @@ class Recu(db.Model):
     client_recu = db.relationship('Client', foreign_keys=[client_id])
 
     def __repr__(self):
-        return f"<Recu {self.numero_recu}>"
+        return f'<Recu {self.numero_recu}>'
 
 
 class Budget(db.Model):
@@ -470,16 +481,16 @@ class Budget(db.Model):
     date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
-        return f"<Budget {self.categorie} {self.annee}>"
+        return f'<Budget {self.categorie} {self.annee}>'
 
 
 class Partenaire(db.Model):
     __tablename__ = 'partenaires'
     
     id = db.Column(db.Integer, primary_key=True)
-    nom = db.Column(db.String(150), nullable=False)
-    email = db.Column(db.String(150))
-    telephone = db.Column(db.String(30))
+    nom = db.Column(db.String(150), nullable=False, index=True)
+    email = db.Column(db.String(150), index=True)
+    telephone = db.Column(db.String(30), index=True)
     numero_identification = db.Column(db.String(50))
     numero_fiscal = db.Column(db.String(50))
     date_partenariat = db.Column(db.Date)
@@ -492,7 +503,7 @@ class Partenaire(db.Model):
     criteres = db.relationship('CriterePartenaire', backref='partenaire', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Partenaire {self.nom}>"
+        return f'<Partenaire {self.nom}>'
 
 
 class CriterePartenaire(db.Model):
@@ -507,7 +518,7 @@ class CriterePartenaire(db.Model):
     date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
-        return f"<CriterePartenaire {self.nom_critere}>"
+        return f'<CriterePartenaire {self.nom_critere}>'
 
 
 
@@ -517,6 +528,106 @@ class DocumentPartenaire(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     partenaire_id = db.Column(db.Integer, db.ForeignKey('partenaires.id', ondelete='CASCADE'), nullable=False)
     nom_document = db.Column(db.String(255), nullable=False)
+    chemin_fichier = db.Column(db.Text, nullable=False)
+    date_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# --- MODULE OCCUPATION ---
+
+class Occupation(db.Model):
+    __tablename__ = 'occupations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    numero_occupation = db.Column(db.String(30), unique=True, nullable=False, index=True)
+    statut = db.Column(db.String(30), default='En préparation', index=True)
+    
+    # FK relations
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='RESTRICT'), nullable=False)
+    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='RESTRICT'), nullable=False)
+    contrat_id = db.Column(db.Integer, db.ForeignKey('contrats.id', ondelete='RESTRICT'), nullable=False)
+    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='RESTRICT'), nullable=False)
+    
+    # Dates
+    date_entree = db.Column(db.Date, nullable=False, index=True)
+    date_sortie_prevue = db.Column(db.Date)
+    date_sortie_reelle = db.Column(db.Date)
+    
+    # Metadata
+    observations = db.Column(db.Text)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    date_modification = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    # Back-references
+    client = db.relationship('Client', backref=db.backref('occupations', lazy='dynamic'))
+    propriete = db.relationship('Propriete', backref=db.backref('occupations', lazy='dynamic'))
+    contrat = db.relationship('Contrat', backref=db.backref('occupations', lazy='dynamic'))
+    agent = db.relationship('Utilisateur', backref=db.backref('occupations_agent', lazy='dynamic'), foreign_keys=[agent_id])
+    
+    # Children
+    occupants = db.relationship('Occupant', backref='occupation', lazy='dynamic', cascade='all, delete-orphan')
+    rapports = db.relationship('RapportVisite', backref='occupation', lazy='dynamic', cascade='all, delete-orphan')
+    documents = db.relationship('DocumentOccupation', backref='occupation', lazy='dynamic', cascade='all, delete-orphan')
+    
+    @property
+    def duree_occupation(self):
+        if self.date_entree:
+            end = self.date_sortie_reelle or self.date_sortie_prevue or datetime.now(timezone.utc).date()
+            return (end - self.date_entree).days
+        return 0
+    
+    @property
+    def nombre_occupants(self):
+        return self.occupants.count() + 1  # +1 for the primary tenant (client)
+    
+    def __repr__(self):
+        return f'<Occupation {self.numero_occupation} - {self.statut}>'
+
+
+class Occupant(db.Model):
+    __tablename__ = 'occupants'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False)
+    nom = db.Column(db.String(100), nullable=False, index=True)
+    prenom = db.Column(db.String(100))
+    sexe = db.Column(db.String(10))
+    date_naissance = db.Column(db.Date)
+    telephone = db.Column(db.String(30))
+    numero_piece = db.Column(db.String(50))
+    type_piece = db.Column(db.String(30))
+    lien_locataire = db.Column(db.String(30))
+    
+    def __repr__(self):
+        return f'<Occupant {self.prenom} {self.nom}>'
+
+
+class RapportVisite(db.Model):
+    __tablename__ = 'rapports_visites'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False)
+    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
+    date_visite = db.Column(db.DateTime, nullable=False, index=True)
+    type_visite = db.Column(db.String(30), nullable=False)
+    commentaires = db.Column(db.Text)
+    observations = db.Column(db.Text)
+    etat_general = db.Column(db.String(30))
+    travaux_prevoir = db.Column(db.Text)
+    date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    agent = db.relationship('Utilisateur', backref=db.backref('rapports_visites', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<RapportVisite {self.type_visite} - {self.date_visite}>'
+
+
+class DocumentOccupation(db.Model):
+    __tablename__ = 'documents_occupations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False)
+    nom_document = db.Column(db.String(255), nullable=False)
+    type_document = db.Column(db.String(100))
     chemin_fichier = db.Column(db.Text, nullable=False)
     date_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 

@@ -96,7 +96,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function() {
     const AJAX_URL = "{{ url_for('partenaires.verifier_doublon_partenaire') }}";
     const EXCLUDE_ID = {{ partenaire.id if partenaire else 'null' }};

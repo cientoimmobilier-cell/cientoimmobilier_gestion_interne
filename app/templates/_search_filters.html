@@ -1,0 +1,28 @@
+{% macro sort_link(label, column, current_sort, current_order, endpoint, kwargs={}) %}
+{% set new_order = 'desc' if current_sort == column and current_order == 'asc' else 'asc' %}
+{% set active = current_sort == column %}
+<a href="{{ url_for(endpoint, sort=column, order=new_order, **kwargs) }}"
+   class="text-decoration-none d-inline-flex align-items-center gap-1 {{ 'text-dark fw-bold' if active else 'text-muted' }}">
+    {{ label }}
+    {% if active %}
+        <i class="fa-solid fa-sort-{{ 'up' if current_order == 'asc' else 'down' }} small"></i>
+    {% else %}
+        <i class="fa-solid fa-sort text-opacity-25 small"></i>
+    {% endif %}
+</a>
+{% endmacro %}
+
+{% macro search_form(endpoint, placeholder='Rechercher...', kwargs={}, extra_filters='') %}
+<form method="GET" action="{{ url_for(endpoint, **kwargs) }}" class="d-flex flex-wrap align-items-center gap-2">
+    <div class="input-group input-group-sm" style="max-width:320px;">
+        <span class="input-group-text bg-white border-end-0 rounded-start-3"><i class="fa-solid fa-search text-muted"></i></span>
+        <input type="text" name="search" class="form-control border-start-0 rounded-end-3" placeholder="{{ placeholder }}"
+               value="{{ request.args.get('search', '') }}" style="font-size:0.9rem;">
+    </div>
+    {{ extra_filters|safe }}
+    <button type="submit" class="btn btn-accent btn-sm rounded-3">Filtrer</button>
+    {% if request.args.get('search') or request.args.get('statut') or request.args.get('type_bien') or request.args.get('type_transaction') or request.args.get('zone') or request.args.get('ville') %}
+        <a href="{{ url_for(endpoint, **kwargs) }}" class="btn btn-outline-secondary btn-sm rounded-3">Réinitialiser</a>
+    {% endif %}
+</form>
+{% endmacro %}

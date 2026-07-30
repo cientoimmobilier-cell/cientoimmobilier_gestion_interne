@@ -78,6 +78,15 @@
                 </li>
                 {% endif %}
 
+                {# Module Occupation — masqué pour le Comptable #}
+                {% if not current_user.is_authenticated or current_user.role != 'Comptable' %}
+                <li class="{% if request.blueprint == 'occupation' %}active{% endif %}">
+                    <a href="{{ url_for('occupation.dashboard') }}">
+                        <i class="fa-solid fa-bed"></i> Gestion Occupations
+                    </a>
+                </li>
+                {% endif %}
+
                 {# Modules opérationnels — masqués pour le Comptable et Partenaires aussi pour Secrétaire #}
                 {% if not current_user.is_authenticated or current_user.role != 'Comptable' %}
                 <li class="{% if request.blueprint == 'airbnb' %}active{% endif %}">
@@ -183,9 +192,11 @@
     </div>
 
     <!-- Bootstrap 5 Bundle JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" nonce="{{ csp_nonce() }}"></script>
+    <!-- Security JS -->
+    <script src="{{ url_for('static', filename='js/security.js') }}" nonce="{{ csp_nonce() }}"></script>
     <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}" nonce="{{ csp_nonce() }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

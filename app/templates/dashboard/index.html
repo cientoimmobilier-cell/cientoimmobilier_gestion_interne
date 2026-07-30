@@ -352,8 +352,8 @@
 
 {% block scripts %}
 <!-- Chart.js de CDN pour générer des graphiques premium -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" nonce="{{ csp_nonce() }}"></script>
+<script nonce="{{ csp_nonce() }}">
     document.addEventListener('DOMContentLoaded', function() {
         const ctx = document.getElementById('propertyTypeChart').getContext('2d');
         

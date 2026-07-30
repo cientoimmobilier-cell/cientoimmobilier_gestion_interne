@@ -1,0 +1,575 @@
+{% extends "base.html" %}
+
+{% block title %}{{ occ.numero_occupation }} - Ciento Immobilier{% endblock %}
+{% block header_title %}{{ occ.numero_occupation }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- En-tête avec statut et actions -->
+    <div class="col-12 mb-4">
+        <div class="card-premium p-3 d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <h4 class="fw-bold text-dark mb-0">{{ occ.numero_occupation }}</h4>
+                {% if occ.statut == 'En pr\u00e9paration' %}
+                <span class="badge bg-warning text-dark rounded-pill fs-6">{{ occ.statut }}</span>
+                {% elif occ.statut == 'Active' %}
+                <span class="badge bg-success rounded-pill fs-6">{{ occ.statut }}</span>
+                {% elif occ.statut == 'Termin\u00e9e' %}
+                <span class="badge bg-secondary rounded-pill fs-6">{{ occ.statut }}</span>
+                {% elif occ.statut == 'R\u00e9sili\u00e9e' %}
+                <span class="badge bg-danger rounded-pill fs-6">{{ occ.statut }}</span>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+                    {% if occ.statut == 'En pr\u00e9paration' %}
+                    <form action="{{ url_for('occupation.activate_occupation', occ_id=occ.id) }}" method="POST" class="d-inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-success rounded-3" data-confirm="Activer cette occupation ? Le bien sera marqu\u00e9 Occup\u00e9.">
+                            <i class="fa-solid fa-play me-2"></i>Activer
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if occ.statut == 'Active' %}
+                    <form action="{{ url_for('occupation.terminate_occupation', occ_id=occ.id) }}" method="POST" class="d-inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="input-group input-group-sm">
+                            <input type="date" name="date_sortie_reelle" class="form-control" required>
+                            <button type="submit" class="btn btn-secondary rounded-end-3" data-confirm="Terminer cette occupation ?">
+                                <i class="fa-solid fa-stop me-2"></i>Terminer
+                            </button>
+                        </div>
+                    </form>
+                    {% endif %}
+                    {% if current_user.role in ['Administrateur', 'Directeur'] and occ.statut in ['En pr\u00e9paration', 'Active'] %}
+                    <form action="{{ url_for('occupation.rescind_occupation', occ_id=occ.id) }}" method="POST" class="d-inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger rounded-3" data-confirm="R\u00e9silier cette occupation ?">
+                            <i class="fa-solid fa-ban me-2"></i>R\u00e9silier
+                        </button>
+                    </form>
+                    {% endif %}
+                    <a href="{{ url_for('occupation.edit_occupation', occ_id=occ.id) }}" class="btn btn-outline-secondary rounded-3">
+                        <i class="fa-solid fa-pen me-2"></i>Modifier
+                    </a>
+                {% endif %}
+                <a href="{{ url_for('occupation.export_pdf', occ_id=occ.id) }}" class="btn btn-outline-danger rounded-3">
+                    <i class="fa-solid fa-file-pdf me-2"></i>PDF
+                </a>
+                <a href="{{ url_for('occupation.list_occupations') }}" class="btn btn-outline-secondary rounded-3">
+                    <i class="fa-solid fa-list me-2"></i>Liste
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs nav-tabs-premium mb-4" id="occupationTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab">
+            <i class="fa-solid fa-circle-info me-1"></i>Informations
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="occupants-tab" data-bs-toggle="tab" data-bs-target="#occupants" type="button" role="tab">
+            <i class="fa-solid fa-users me-1"></i>Occupants ({{ occ.nombre_occupants }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="rapports-tab" data-bs-toggle="tab" data-bs-target="#rapports" type="button" role="tab">
+            <i class="fa-solid fa-clipboard-list me-1"></i>Rapports ({{ rapports|length }})
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents" type="button" role="tab">
+            <i class="fa-solid fa-paperclip me-1"></i>Documents ({{ documents|length }})
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="occupationTabsContent">
+    <!-- TAB 1: Informations -->
+    <div class="tab-pane fade show active" id="info" role="tabpanel">
+        <div class="row g-4">
+            <!-- Colonne gauche : Locataire + Dates -->
+            <div class="col-lg-6">
+                <!-- Locataire -->
+                <div class="card-premium p-4 mb-4">
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="fa-solid fa-user-tie text-warning me-2"></i>Locataire
+                    </h6>
+                    <div class="mb-2"><strong>Nom :</strong> {{ occ.client.prenom }} {{ occ.client.nom }}</div>
+                    <div class="mb-2"><strong>Code client :</strong> <span class="font-monospace">{{ occ.client.code_client or 'N/A' }}</span></div>
+                    <div class="mb-2"><strong>T\u00e9l\u00e9phone :</strong> {{ occ.client.telephone or 'N/A' }}</div>
+                    <div class="mb-2"><strong>Email :</strong> {{ occ.client.email or 'N/A' }}</div>
+                    <div class="mb-2"><strong>Adresse :</strong> {{ occ.client.adresse or 'N/A' }}</div>
+                    <div class="mb-2"><strong>Pi\u00e8ce d'identit\u00e9 :</strong> {{ occ.client.type_piece or '' }} {{ occ.client.numero_identite or 'N/A' }}</div>
+                </div>
+
+                <!-- Agent -->
+                <div class="card-premium p-4 mb-4">
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="fa-solid fa-user-tie text-info me-2"></i>Agent responsable
+                    </h6>
+                    <div class="mb-2"><strong>Nom :</strong> {{ occ.agent.prenom }} {{ occ.agent.nom }}</div>
+                    <div class="mb-2"><strong>T\u00e9l\u00e9phone :</strong> {{ occ.agent.telephone or 'N/A' }}</div>
+                    <div class="mb-2"><strong>Email :</strong> {{ occ.agent.email or 'N/A' }}</div>
+                </div>
+
+                <!-- Propri\u00e9taire -->
+                <div class="card-premium p-4 mb-4">
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="fa-solid fa-user-shield text-success me-2"></i>Propri\u00e9taire
+                    </h6>
+                    {% set owner = occ.propriete.proprietaire if occ.propriete else None %}
+                    {% if owner %}
+                    <div class="mb-2"><strong>Nom :</strong> {{ owner.prenom }} {{ owner.nom }}</div>
+                    <div class="mb-2"><strong>Code propri\u00e9taire :</strong> <span class="font-monospace">#{{ owner.id }}</span></div>
+                    <div class="mb-2"><strong>T\u00e9l\u00e9phone :</strong> {{ owner.telephone or 'N/A' }}</div>
+                    <div class="mb-2"><strong>Email :</strong> {{ owner.email or 'N/A' }}</div>
+                    <div class="mb-2"><strong>Adresse :</strong> {{ owner.adresse or 'N/A' }}</div>
+                    {% else %}
+                    <p class="text-muted mb-0">Aucun propri\u00e9taire associ\u00e9.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Colonne droite : Bien + Contrat + Dates -->
+            <div class="col-lg-6">
+                <!-- Bien -->
+                <div class="card-premium p-4 mb-4">
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="fa-solid fa-house-chimney text-warning me-2"></i>Bien immobilier
+                    </h6>
+                    {% set p = occ.propriete %}
+                    {% if p %}
+                    <div class="mb-2"><strong>Code bien :</strong> <span class="font-monospace">{{ p.reference_bien }}</span></div>
+                    <div class="mb-2"><strong>Adresse :</strong> {{ p.adresse or '' }}, {{ p.ville or '' }}</div>
+                    <div class="mb-2"><strong>Type :</strong> {{ p.type_bien }}</div>
+                    <div class="mb-2"><strong>Pi\u00e8ces :</strong> {{ p.nombre_chambres or 0 }} ch. / {{ p.nombre_salles_bain or 0 }} sdb</div>
+                    <div class="mb-2"><strong>Surface :</strong> {{ p.superficie or 'N/A' }} m\u00b2</div>
+                    <div class="mb-2"><strong>Statut :</strong> <span class="badge bg-{{ 'success' if p.statut == 'Disponible' else 'secondary' }}">{{ p.statut }}</span></div>
+                    {% else %}
+                    <p class="text-muted mb-0">Bien non trouv\u00e9.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Contrat -->
+                <div class="card-premium p-4 mb-4">
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="fa-solid fa-file-contract text-warning me-2"></i>Contrat de bail
+                    </h6>
+                    {% set c = occ.contrat %}
+                    {% if c %}
+                    <div class="mb-2"><strong>N\u00b0 Contrat :</strong> {{ c.numero_contrat }}</div>
+                    <div class="mb-2"><strong>Date signature :</strong> {{ c.date_signature.strftime('%d/%m/%Y') if c.date_signature else '--' }}</div>
+                    <div class="mb-2"><strong>D\u00e9but :</strong> {{ c.date_debut.strftime('%d/%m/%Y') if c.date_debut else '--' }}</div>
+                    <div class="mb-2"><strong>Fin :</strong> {{ c.date_fin.strftime('%d/%m/%Y') if c.date_fin else '--' }}</div>
+                    <div class="mb-2"><strong>Loyer :</strong> {{ c.montant_loyer|format_price if c.montant_loyer else '--' }}</div>
+                    <div class="mb-2"><strong>D\u00e9p\u00f4t garantie :</strong> {{ c.depot_garantie|format_price if c.depot_garantie else '--' }}</div>
+                    <div class="mb-2"><strong>Mode paiement :</strong> {{ c.mode_paiement or '--' }}</div>
+                    <div class="mb-2"><strong>Fr\u00e9quence :</strong> {{ c.frequence or '--' }}</div>
+                    <div class="mb-2"><strong>Statut :</strong> {{ c.statut or '--' }}</div>
+                    {% else %}
+                    <p class="text-muted mb-0">Aucun contrat associ\u00e9.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Dates -->
+                <div class="card-premium p-4 mb-4">
+                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                        <i class="fa-solid fa-calendar text-warning me-2"></i>P\u00e9riode d'occupation
+                    </h6>
+                    <div class="mb-2"><strong>Date d'entr\u00e9e :</strong> {{ occ.date_entree.strftime('%d/%m/%Y') if occ.date_entree else '--' }}</div>
+                    <div class="mb-2"><strong>Date sortie pr\u00e9vue :</strong> {{ occ.date_sortie_prevue.strftime('%d/%m/%Y') if occ.date_sortie_prevue else '--' }}</div>
+                    <div class="mb-2"><strong>Date sortie r\u00e9elle :</strong> {{ occ.date_sortie_reelle.strftime('%d/%m/%Y') if occ.date_sortie_reelle else 'Non termin\u00e9e' }}</div>
+                    <div class="mb-2"><strong>Dur\u00e9e :</strong> {{ occ.duree_occupation }} jours</div>
+                    {% if occ.observations %}
+                    <div class="mt-3 p-3 bg-light rounded-3">
+                        <strong class="text-muted small">Observations :</strong>
+                        <p class="mb-0 mt-1">{{ occ.observations }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: Occupants -->
+    <div class="tab-pane fade" id="occupants" role="tabpanel">
+        <div class="card-premium p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">
+                    <i class="fa-solid fa-users text-warning me-2"></i>Occupants ({{ occ.nombre_occupants }})
+                </h5>
+                {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+                <button type="button" class="btn btn-accent btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addOccupantModal">
+                    <i class="fa-solid fa-plus me-1"></i>Ajouter un occupant
+                </button>
+                {% endif %}
+            </div>
+
+            <!-- Locataire principal -->
+            <div class="p-3 bg-light rounded-3 mb-3">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle bg-warning text-dark d-flex align-items-center justify-content-center fw-bold me-3" style="width:40px;height:40px;">
+                        {{ occ.client.prenom[0]|upper }}{{ occ.client.nom[0]|upper }}
+                    </div>
+                    <div>
+                        <strong class="text-dark">{{ occ.client.prenom }} {{ occ.client.nom }}</strong>
+                        <span class="badge bg-warning text-dark ms-2">Locataire principal</span>
+                        <div class="text-muted small">{{ occ.client.telephone or '' }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Autres occupants -->
+            {% if occupants %}
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Pr\u00e9nom</th>
+                            <th>Sexe</th>
+                            <th>Date naissance</th>
+                            <th>T\u00e9l\u00e9phone</th>
+                            <th>Pi\u00e8ce</th>
+                            <th>Lien</th>
+                            {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+                            <th class="text-end">Actions</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for occpt in occupants %}
+                        <tr>
+                            <td>{{ occpt.nom }}</td>
+                            <td>{{ occpt.prenom }}</td>
+                            <td>{{ occpt.sexe or '--' }}</td>
+                            <td>{{ occpt.date_naissance.strftime('%d/%m/%Y') if occpt.date_naissance else '--' }}</td>
+                            <td>{{ occpt.telephone or '--' }}</td>
+                            <td>{{ occpt.type_piece or '' }} {{ occpt.numero_piece or '' }}</td>
+                            <td><span class="badge bg-info text-dark">{{ occpt.lien_locataire or '--' }}</span></td>
+                            {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+                            <td class="text-end">
+                                <form action="{{ url_for('occupation.delete_occupant', occ_id=occ.id, occupant_id=occpt.id) }}" method="POST" class="d-inline" data-confirm="Supprimer cet occupant ?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3"><i class="fa-solid fa-trash-can"></i></button>
+                                </form>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted text-center py-4 mb-0">Aucun occupant suppl\u00e9mentaire enregistr\u00e9.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- TAB 3: Rapports de visite -->
+    <div class="tab-pane fade" id="rapports" role="tabpanel">
+        <div class="card-premium p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">
+                    <i class="fa-solid fa-clipboard-list text-warning me-2"></i>Rapports de visite ({{ rapports|length }})
+                </h5>
+                {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+                <button type="button" class="btn btn-accent btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addRapportModal">
+                    <i class="fa-solid fa-plus me-1"></i>Ajouter un rapport
+                </button>
+                {% endif %}
+            </div>
+
+            {% if rapports %}
+            <!-- Timeline -->
+            <div class="timeline">
+                {% for r in rapports %}
+                <div class="timeline-item mb-4">
+                    <div class="d-flex">
+                        <div class="timeline-icon me-3">
+                            <div class="rounded-circle bg-{{ 'success' if r.type_visite == 'Entr\u00e9e' else 'danger' if r.type_visite == 'Sortie' else 'info' if r.type_visite == 'Contr\u00f4le' else 'warning' if r.type_visite == 'Maintenance' else 'secondary' }} d-flex align-items-center justify-content-center text-white" style="width:36px;height:36px;">
+                                <i class="fa-solid fa-{{ 'door-open' if r.type_visite == 'Entr\u00e9e' else 'door-closed' if r.type_visite == 'Sortie' else 'clipboard-check' if r.type_visite == 'Contr\u00f4le' else 'wrench' if r.type_visite == 'Maintenance' else 'search' }} small"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong class="text-dark">{{ r.type_visite }}</strong>
+                                    <span class="text-muted small ms-2">{{ r.date_visite.strftime('%d/%m/%Y %H:%M') }}</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <small class="text-muted">{{ r.agent.prenom if r.agent else '' }} {{ r.agent.nom if r.agent else '' }}</small>
+                                    {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                                    <form action="{{ url_for('occupation.delete_rapport', occ_id=occ.id, rapport_id=r.id) }}" method="POST" class="d-inline" data-confirm="Supprimer ce rapport ?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3"><i class="fa-solid fa-trash-can"></i></button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if r.commentaires %}
+                            <p class="mb-1 mt-2">{{ r.commentaires }}</p>
+                            {% endif %}
+                            {% if r.observations %}
+                            <p class="text-muted small mb-1"><em>{{ r.observations }}</em></p>
+                            {% endif %}
+                            {% if r.etat_general or r.travaux_prevoir %}
+                            <div class="d-flex gap-3 mt-2">
+                                {% if r.etat_general %}
+                                <span class="badge bg-light text-dark">\u00c9tat: {{ r.etat_general }}</span>
+                                {% endif %}
+                                {% if r.travaux_prevoir %}
+                                <span class="badge bg-warning bg-opacity-10 text-warning">Travaux: {{ r.travaux_prevoir }}</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted text-center py-4 mb-0">Aucun rapport de visite pour cette occupation.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- TAB 4: Documents -->
+    <div class="tab-pane fade" id="documents" role="tabpanel">
+        <div class="card-premium p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold text-dark mb-0">
+                    <i class="fa-solid fa-paperclip text-warning me-2"></i>Documents ({{ documents|length }})
+                </h5>
+                {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+                <button type="button" class="btn btn-accent btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#addDocumentModal">
+                    <i class="fa-solid fa-upload me-1"></i>Ajouter un document
+                </button>
+                {% endif %}
+            </div>
+
+            {% if documents %}
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>Document</th>
+                            <th>Type</th>
+                            <th>Date d'upload</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in documents %}
+                        <tr>
+                            <td class="fw-semibold">{{ d.nom_document }}</td>
+                            <td><span class="badge bg-light text-dark">{{ d.type_document }}</span></td>
+                            <td>{{ d.date_upload.strftime('%d/%m/%Y %H:%M') if d.date_upload else '--' }}</td>
+                            <td class="text-end">
+                                <a href="{{ url_for('static', filename=d.chemin_fichier) }}" class="btn btn-sm btn-outline-primary rounded-3" target="_blank" title="Voir">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+                                <form action="{{ url_for('occupation.delete_document', occ_id=occ.id, doc_id=d.id) }}" method="POST" class="d-inline" data-confirm="Supprimer ce document ?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3"><i class="fa-solid fa-trash-can"></i></button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted text-center py-4 mb-0">Aucun document joint \u00e0 cette occupation.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Ajouter Occupant -->
+{% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+<div class="modal fade" id="addOccupantModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-3 shadow border-0">
+            <div class="modal-header border-bottom-0 bg-light rounded-top-3">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-plus text-warning me-2"></i>Ajouter un occupant</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('occupation.add_occupant', occ_id=occ.id) }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted small">Nom <span class="text-danger">*</span></label>
+                            <input type="text" name="nom" class="form-control form-control-premium" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted small">Pr\u00e9nom</label>
+                            <input type="text" name="prenom" class="form-control form-control-premium">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-muted small">Sexe</label>
+                            <select name="sexe" class="form-select form-control-premium">
+                                <option value="">--</option>
+                                <option value="Masculin">Masculin</option>
+                                <option value="F\u00e9minin">F\u00e9minin</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-muted small">Date naissance</label>
+                            <input type="date" name="date_naissance" class="form-control form-control-premium">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-muted small">T\u00e9l\u00e9phone</label>
+                            <input type="text" name="telephone" class="form-control form-control-premium">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted small">N\u00b0 Pi\u00e8ce</label>
+                            <input type="text" name="numero_piece" class="form-control form-control-premium">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted small">Type pi\u00e8ce</label>
+                            <select name="type_piece" class="form-select form-control-premium">
+                                <option value="">--</option>
+                                <option value="CNI">CNI</option>
+                                <option value="Passeport">Passeport</option>
+                                <option value="Permis">Permis</option>
+                                <option value="Autre">Autre</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-muted small">Lien avec le locataire</label>
+                            <select name="lien_locataire" class="form-select form-control-premium">
+                                <option value="">--</option>
+                                <option value="Conjoint">Conjoint</option>
+                                <option value="Enfant">Enfant</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Ami">Ami</option>
+                                <option value="Employ\u00e9">Employ\u00e9</option>
+                                <option value="Autre">Autre</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 p-3 bg-light rounded-bottom-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Fermer</button>
+                    <button type="submit" class="btn btn-accent rounded-3"><i class="fa-solid fa-save me-1"></i>Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Ajouter Rapport -->
+<div class="modal fade" id="addRapportModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content rounded-3 shadow border-0">
+            <div class="modal-header border-bottom-0 bg-light rounded-top-3">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-clipboard-plus text-warning me-2"></i>Ajouter un rapport de visite</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('occupation.add_rapport', occ_id=occ.id) }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-muted small">Date <span class="text-danger">*</span></label>
+                            <input type="date" name="date_visite" class="form-control form-control-premium" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-muted small">Heure</label>
+                            <input type="time" name="heure_visite" class="form-control form-control-premium">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold text-muted small">Type <span class="text-danger">*</span></label>
+                            <select name="type_visite" class="form-select form-control-premium" required>
+                                <option value="">--</option>
+                                <option value="Entr\u00e9e">Entr\u00e9e</option>
+                                <option value="Contr\u00f4le">Contr\u00f4le</option>
+                                <option value="Maintenance">Maintenance</option>
+                                <option value="Inspection">Inspection</option>
+                                <option value="Sortie">Sortie</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted small">Agent</label>
+                            <select name="agent_id" class="form-select form-control-premium">
+                                <option value="">Moi-m\u00eame ({{ current_user.prenom }} {{ current_user.nom }})</option>
+                                {% for a in agents_list %}
+                                <option value="{{ a.id }}">{{ a.prenom }} {{ a.nom }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-muted small">\u00c9tat g\u00e9n\u00e9ral</label>
+                            <select name="etat_general" class="form-select form-control-premium">
+                                <option value="">--</option>
+                                <option value="Excellent">Excellent</option>
+                                <option value="Bon">Bon</option>
+                                <option value="Moyen">Moyen</option>
+                                <option value="Mauvais">Mauvais</option>
+                                <option value="Critique">Critique</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-muted small">Commentaires</label>
+                            <textarea name="commentaires" class="form-control form-control-premium" rows="2" placeholder="Commentaires..."></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-muted small">Observations</label>
+                            <textarea name="observations" class="form-control form-control-premium" rows="2" placeholder="Observations..."></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-muted small">Travaux \u00e0 pr\u00e9voir</label>
+                            <input type="text" name="travaux_prevoir" class="form-control form-control-premium" placeholder="Travaux \u00e0 pr\u00e9voir...">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 p-3 bg-light rounded-bottom-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Fermer</button>
+                    <button type="submit" class="btn btn-accent rounded-3"><i class="fa-solid fa-save me-1"></i>Ajouter le rapport</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Ajouter Document -->
+<div class="modal fade" id="addDocumentModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-3 shadow border-0">
+            <div class="modal-header border-bottom-0 bg-light rounded-top-3">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-file-upload text-warning me-2"></i>Ajouter un document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('occupation.upload_document', occ_id=occ.id) }}" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-muted small">Nom du document</label>
+                        <input type="text" name="nom_document" class="form-control form-control-premium" placeholder="Contrat sign\u00e9, \u00c9tat des lieux...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold text-muted small">Fichier <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-premium" type="file" name="document" required
+                               accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.webp,.gif">
+                        <small class="text-muted">Formats accept\u00e9s : PDF, DOC, DOCX, XLS, XLSX, TXT, PNG, JPG, WEBP, GIF (max 15 Mo)</small>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 p-3 bg-light rounded-bottom-3">
+                    <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Fermer</button>
+                    <button type="submit" class="btn btn-accent rounded-3"><i class="fa-solid fa-upload me-1"></i>Uploader</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

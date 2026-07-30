@@ -1,11 +1,16 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+import logging
+import traceback
+from flask import Blueprint, render_template, redirect, url_for, request, flash, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from app.models import Utilisateur
 from app.utils.helpers import log_activity
 from app import db
+from sqlalchemy import select
 from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 auth = Blueprint('auth', __name__)
 
@@ -65,7 +70,7 @@ def login():
         password = request.form.get('password')
         remember = True if request.form.get('remember') else False
         
-        user = Utilisateur.query.filter_by(email=email).first()
+        user = db.session.execute(select(Utilisateur).where(Utilisateur.email == email)).scalars().first()
         
         if not user or not user.check_password(password):
             _record_failed_attempt(client_ip)
@@ -86,7 +91,7 @@ def login():
         login_user(user, remember=remember)
         log_activity(user.id, "Connexion réussie")
         
-        # Validation de l'URL de redirection (Fix #1 — Open Redirect)
+        # Validation de l'URL de redirection (Open Redirect)
         next_page = request.args.get('next')
         if next_page and _is_safe_redirect_url(next_page):
             return redirect(next_page)

@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from '_search_filters.html' import sort_link, search_form %}
+{% from '_pagination.html' import render_pagination %}
 
 {% block title %}Gestion des Propriétaires - Ciento Immobilier{% endblock %}
 {% block header_title %}Portefeuille Propriétaires{% endblock %}
@@ -21,6 +23,8 @@
                         <a href="{{ url_for('owners.list_owners') }}" class="btn btn-outline-secondary ms-2 border-0 rounded-circle"><i class="fa-solid fa-times"></i></a>
                         {% endif %}
                     </form>
+
+                    {{ search_form('owners.list_owners', placeholder='Rechercher un propriétaire...') }}
                     
                     <a href="{{ url_for('owners.export_owners') }}" class="btn btn-outline-success rounded-3"><i class="fa-solid fa-file-excel me-2"></i>Exporter</a>
                     {% if current_user.role in ['Administrateur', 'Directeur'] %}
@@ -62,7 +66,7 @@
                                 <a href="{{ url_for('owners.view_owner', owner_id=owner.id) }}" class="btn btn-sm btn-outline-primary rounded-3 me-1" title="Voir les détails"><i class="fa-solid fa-eye"></i></a>
                                 <a href="{{ url_for('owners.edit_owner', owner_id=owner.id) }}" class="btn btn-sm btn-outline-secondary rounded-3 me-1" title="Modifier"><i class="fa-solid fa-pen"></i></a>
                                 {% if current_user.role in ['Administrateur', 'Directeur'] %}
-                                <form action="{{ url_for('owners.delete_owner', owner_id=owner.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce propriétaire ? Les biens associés resteront en base mais sans propriétaire assigné.');">
+                                <form action="{{ url_for('owners.delete_owner', owner_id=owner.id) }}" method="POST" class="d-inline" data-confirm="Êtes-vous sûr de vouloir supprimer ce propriétaire ? Les biens associés resteront en base mais sans propriétaire assigné.">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
                                 </form>
@@ -80,6 +84,8 @@
         </div>
     </div>
 </div>
+
+{{ render_pagination(pagination, 'owners.list_owners') }}
 
 <!-- Modal Import Excel Propriétaires -->
 <div class="modal fade" id="importOwnersModal" tabindex="-1" aria-labelledby="importOwnersModalLabel" aria-hidden="true">

@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Occupations - Ciento Immobilier{% endblock %}
+{% block header_title %}Dashboard Occupations{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card-premium d-flex align-items-center p-3">
+            <div class="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
+                <i class="fa-solid fa-person-walking-arrow-right text-warning fs-4"></i>
+            </div>
+            <div>
+                <h3 class="fw-bold text-dark mb-0">{{ actives }}</h3>
+                <small class="text-muted">Occupations Actives</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card-premium d-flex align-items-center p-3">
+            <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                <i class="fa-solid fa-check-circle text-success fs-4"></i>
+            </div>
+            <div>
+                <h3 class="fw-bold text-dark mb-0">{{ terminees }}</h3>
+                <small class="text-muted">Occupations Terminées</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card-premium d-flex align-items-center p-3">
+            <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
+                <i class="fa-solid fa-right-to-bracket text-info fs-4"></i>
+            </div>
+            <div>
+                <h3 class="fw-bold text-dark mb-0">{{ entrees_mois }}</h3>
+                <small class="text-muted">Entrées ce mois</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card-premium d-flex align-items-center p-3">
+            <div class="rounded-circle bg-danger bg-opacity-10 p-3 me-3">
+                <i class="fa-solid fa-left-from-bracket text-danger fs-4"></i>
+            </div>
+            <div>
+                <h3 class="fw-bold text-dark mb-0">{{ sorties_mois }}</h3>
+                <small class="text-muted">Sorties ce mois</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card-premium d-flex align-items-center p-3">
+            <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                <i class="fa-solid fa-house-chimney text-primary fs-4"></i>
+            </div>
+            <div>
+                <h3 class="fw-bold text-dark mb-0">{{ biens_occupes }}</h3>
+                <small class="text-muted">Biens Occupés</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card-premium d-flex align-items-center p-3">
+            <div class="rounded-circle bg-secondary bg-opacity-10 p-3 me-3">
+                <i class="fa-solid fa-house-circle-check text-secondary fs-4"></i>
+            </div>
+            <div>
+                <h3 class="fw-bold text-dark mb-0">{{ biens_disponibles }}</h3>
+                <small class="text-muted">Biens Disponibles</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card-premium d-flex align-items-center p-3">
+            <div class="rounded-circle bg-purple bg-opacity-10 p-3 me-3">
+                <i class="fa-solid fa-chart-pie text-purple fs-4"></i>
+            </div>
+            <div>
+                <h3 class="fw-bold text-dark mb-0">{{ taux }}%</h3>
+                <small class="text-muted">Taux d'occupation</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-lg-6 col-md-6">
+        <div class="card-premium d-flex align-items-center p-3">
+            <div class="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
+                <i class="fa-solid fa-users text-warning fs-4"></i>
+            </div>
+            <div>
+                <h3 class="fw-bold text-dark mb-0">{{ total_occupants }}</h3>
+                <small class="text-muted">Occupants Totaux</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-4">
+        <div class="card-premium p-4 text-center">
+            <div class="rounded-circle bg-info bg-opacity-10 p-4 mx-auto mb-3 d-inline-flex">
+                <i class="fa-solid fa-clipboard-list text-info fs-1"></i>
+            </div>
+            <h2 class="fw-bold text-dark">{{ visites_effectuees }}</h2>
+            <p class="text-muted">Rapports de visite effectués</p>
+        </div>
+    </div>
+
+    <div class="col-xl-8">
+        <div class="card-premium p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-clock-rotate-left text-warning me-2"></i>Dernières occupations actives</h5>
+                <a href="{{ url_for('occupation.list_occupations') }}" class="btn btn-sm btn-outline-secondary rounded-3">
+                    <i class="fa-solid fa-list me-1"></i>Toutes les occupations
+                </a>
+            </div>
+            {% if dernieres %}
+            <div class="table-responsive">
+                <table class="table table-hover table-premium mb-0">
+                    <thead>
+                        <tr>
+                            <th>N° Occupation</th>
+                            <th>Client</th>
+                            <th>Bien</th>
+                            <th>Date entrée</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for occ in dernieres %}
+                        <tr>
+                            <td><span class="badge bg-light text-dark font-monospace">{{ occ.numero_occupation }}</span></td>
+                            <td class="fw-semibold">{{ occ.client.prenom }} {{ occ.client.nom }}</td>
+                            <td>{{ occ.propriete.reference_bien if occ.propriete else 'N/A' }}</td>
+                            <td>{{ occ.date_entree.strftime('%d/%m/%Y') if occ.date_entree else '--' }}</td>
+                            <td class="text-end">
+                                <a href="{{ url_for('occupation.view_occupation', occ_id=occ.id) }}" class="btn btn-sm btn-outline-primary rounded-3">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted text-center py-4 mb-0">Aucune occupation active pour le moment.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card-premium p-4">
+            <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-bolt text-warning me-2"></i>Actions rapides</h5>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('occupation.create_occupation') }}" class="btn btn-accent rounded-3">
+                    <i class="fa-solid fa-plus me-2"></i>Nouvelle occupation
+                </a>
+                <a href="{{ url_for('occupation.list_occupations') }}" class="btn btn-outline-secondary rounded-3">
+                    <i class="fa-solid fa-list me-2"></i>Liste des occupations
+                </a>
+                <a href="{{ url_for('occupation.export_excel') }}" class="btn btn-outline-success rounded-3">
+                    <i class="fa-solid fa-file-excel me-2"></i>Exporter Excel
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

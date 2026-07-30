@@ -57,6 +57,7 @@ def create_app(config_class=None):
     from app.routes.agents import agents as agents_blueprint
     from app.routes.finance import finance as finance_blueprint
     from app.routes.partenaires import partenaires as partenaires_blueprint
+    from app.routes.occupation import occupation as occupation_blueprint
     
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(dashboard_blueprint, url_prefix='/')
@@ -69,6 +70,7 @@ def create_app(config_class=None):
     app.register_blueprint(agents_blueprint, url_prefix='/agents')
     app.register_blueprint(finance_blueprint, url_prefix='/finance')
     app.register_blueprint(partenaires_blueprint, url_prefix='/partenaires')
+    app.register_blueprint(occupation_blueprint, url_prefix='/occupations')
     
     # Contexte global pour les templates (rôles et utilitaires)
     @app.context_processor
@@ -101,26 +103,22 @@ def create_app(config_class=None):
         else:
             return f"{formatted} €"
 
-    # En-têtes HTTP de sécurité
+    # Injecter le nonce CSP dans tous les templates
+    @app.context_processor
+    def inject_csp_nonce():
+        from app.utils.security import generate_nonce
+        return dict(csp_nonce=generate_nonce())
+
+    # En-têtes HTTP de sécurité (CSP, HSTS, etc.)
     @app.after_request
     def set_security_headers(response):
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
-        response.headers['X-XSS-Protection'] = '1; mode=block'
-        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        # Content Security Policy — autorise Bootstrap/FontAwesome CDN et inline styles nécessaires
-        response.headers['Content-Security-Policy'] = (
-            "default-src 'self'; "
-            "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
-            "style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline'; "
-            "font-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
-            "img-src 'self' data:; "
-            "frame-ancestors 'self'"
-        )
-        response.headers['Permissions-Policy'] = 'geolocation=(), camera=(), microphone=()'
-        # HSTS uniquement si pas en mode debug (nécessite HTTPS)
+        from app.utils.security import build_csp, SECURITY_HEADERS
+        for header, value in SECURITY_HEADERS.items():
+            response.headers[header] = value
+        response.headers['Content-Security-Policy'] = build_csp()
         if not app.debug:
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return response
 
     # Gestionnaires d'erreurs — ne jamais divulguer les détails internes
@@ -175,25 +173,13 @@ def create_app(config_class=None):
         
     @app.route('/health')
     def health_check():
+        """
+        Endpoint de healthcheck — retourne uniquement 'OK'.
+        NOTE : L'initialisation de la base de données doit être réalisée
+        exclusivement via la commande : python init_db.py
+        La route /setup-database a été supprimée car elle constituait une
+        vulnérabilité critique (création de compte admin sans authentification).
+        """
         return "OK", 200
-        
-    @app.route('/setup-database')
-    def setup_database():
-        try:
-            db.create_all()
-            from app.models import Utilisateur
-            # Ajouter un admin si vide
-            if not Utilisateur.query.first():
-                admin = Utilisateur(
-                    nom='Immobilier', prenom='Admin', email='admin@ciento.immo',
-                    telephone='000', role='Administrateur', actif=True
-                )
-                admin.set_password('AdminCiento123!')
-                db.session.add(admin)
-                db.session.commit()
-                return "Base de donnees initialisee. Compte admin cree (admin@ciento.immo / AdminCiento123!)", 200
-            return "Base de donnees verifiee. Tables deja existantes.", 200
-        except Exception as e:
-            return f"Erreur de connexion a la base de donnees : {e}", 500
-            
+
     return app

@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from '_search_filters.html' import sort_link, search_form %}
+{% from '_pagination.html' import render_pagination %}
 
 {% block title %}Services AirBNB - Ciento Immobilier{% endblock %}
 {% block header_title %}Gestion AirBNB{% endblock %}
@@ -70,6 +72,8 @@
     </form>
 </div>
 
+{{ search_form('airbnb.list_biens', placeholder='Rechercher un bien...') }}
+
 <!-- Toolbar -->
 <div class="d-flex justify-content-end gap-2 mb-4">
     <a href="{{ url_for('airbnb.add_bien') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un bien AirBNB</a>
@@ -135,4 +139,6 @@
     </div>
     {% endfor %}
 </div>
+
+{{ render_pagination(pagination, 'airbnb.list_biens') }}
 {% endblock %}

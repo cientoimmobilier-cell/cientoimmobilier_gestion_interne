@@ -9,18 +9,18 @@ from reportlab.lib import colors
 
 def format_currency_pdf(amount, currency):
     try:
-        formatted = "{:,.2f}".format(float(amount)).replace(',', ' ')
+        formatted = '{:,.2f}'.format(float(amount)).replace(',', ' ')
         if formatted.endswith('.00'):
             formatted = formatted[:-3]
     except (ValueError, TypeError):
         return amount
-        
+
     if currency == 'USD':
-        return f"${formatted}"
+        return f'${formatted}'
     elif currency == 'HTG':
-        return f"{formatted} HTG"
+        return f'{formatted} HTG'
     else:
-        return f"{formatted} €"
+        return f'{formatted} €'
 
 def generate_transaction_sheet_pdf(transaction):
     buffer = BytesIO()
@@ -517,8 +517,222 @@ def generate_airbnb_sheet_pdf(bien):
     story.append(Spacer(1, 40))
     
     # Footer
-    story.append(Paragraph("Ciento Immobilier — Document généré automatiquement en local.", footer_style))
+    story.append(Paragraph("Ciento Immobilier \u2014 Document g\u00e9n\u00e9r\u00e9 automatiquement en local.", footer_style))
     
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+def generate_occupation_fiche_pdf(occupation):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        rightMargin=40, leftMargin=40,
+        topMargin=40, bottomMargin=40
+    )
+    story = []
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'OccTitle', parent=styles['Heading1'],
+        fontName='Helvetica-Bold', fontSize=20, leading=24,
+        textColor=colors.HexColor('#0f172a'), spaceAfter=15
+    )
+    section_style = ParagraphStyle(
+        'OccSection', parent=styles['Heading2'],
+        fontName='Helvetica-Bold', fontSize=12, leading=16,
+        textColor=colors.HexColor('#d97706'), spaceBefore=15, spaceAfter=8
+    )
+    normal_style = ParagraphStyle(
+        'OccNormal', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=10, leading=14,
+        textColor=colors.HexColor('#334155')
+    )
+    bold_style = ParagraphStyle(
+        'OccBold', parent=normal_style, fontName='Helvetica-Bold'
+    )
+    footer_style = ParagraphStyle(
+        'OccFooter', parent=styles['Italic'],
+        fontName='Helvetica-Oblique', fontSize=8, leading=10,
+        textColor=colors.HexColor('#64748b'), alignment=1
+    )
+
+    logo_path = os.path.join(current_app.root_path, 'static', 'logo.jpg')
+    header_data = []
+    if os.path.exists(logo_path):
+        img = Image(logo_path, width=80, height=50)
+        img.hAlign = 'LEFT'
+        logo_cell = img
+    else:
+        logo_cell = Paragraph('<b>CIENTO IMMOBILIER</b>', bold_style)
+
+    from datetime import datetime as dt
+    info_text = f"""<b>CIENTO IMMOBILIER</b><br/>
+    <i>La Solution en Service Immobilier</i><br/>
+    Module Occupation<br/>
+    Date : {dt.now().strftime('%d/%m/%Y \u00e0 %H:%M')}<br/>
+    R\u00e9f : {occupation.numero_occupation}
+    """
+    header_data.append([logo_cell, Paragraph(info_text, normal_style)])
+    header_table = Table(header_data, colWidths=[150, 380])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    story.append(header_table)
+
+    line_table = Table([['']], colWidths=[530], rowHeights=[2])
+    line_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#0f172a')),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(line_table)
+    story.append(Spacer(1, 15))
+
+    story.append(Paragraph("FICHE D'OCCUPATION", title_style))
+    story.append(Paragraph(
+        f'Cette fiche r\u00e9capitule les d\u00e9tails de l\'occupation <b>{occupation.numero_occupation}</b>.',
+        normal_style
+    ))
+    story.append(Spacer(1, 10))
+
+    # 1. Informations g\u00e9n\u00e9rales
+    story.append(Paragraph('1. Informations g\u00e9n\u00e9rales', section_style))
+    summary_data = [
+        [Paragraph('N\u00b0 Occupation :', bold_style), Paragraph(occupation.numero_occupation, normal_style)],
+        [Paragraph('Statut :', bold_style), Paragraph(occupation.statut, normal_style)],
+        [Paragraph("Date d'entr\u00e9e :", bold_style),
+         Paragraph(occupation.date_entree.strftime('%d/%m/%Y') if occupation.date_entree else '--', normal_style)],
+        [Paragraph('Date sortie pr\u00e9vue :', bold_style),
+         Paragraph(occupation.date_sortie_prevue.strftime('%d/%m/%Y') if occupation.date_sortie_prevue else '--', normal_style)],
+        [Paragraph('Date sortie r\u00e9elle :', bold_style),
+         Paragraph(occupation.date_sortie_reelle.strftime('%d/%m/%Y') if occupation.date_sortie_reelle else '--', normal_style)],
+        [Paragraph('Dur\u00e9e (jours) :', bold_style), Paragraph(str(occupation.duree_occupation), normal_style)],
+    ]
+    summary_table = Table(summary_data, colWidths=[180, 350])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('PADDING', (0, 0), (-1, -1), 6),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 10))
+
+    # 2. Parties
+    story.append(Paragraph('2. Parties concern\u00e9es', section_style))
+    client_name = f'{occupation.client.prenom or ""} {occupation.client.nom or ""}'.strip() if occupation.client else 'N/A'
+    client_contact = f'T\u00e9l: {occupation.client.telephone or "N/A"} | Email: {occupation.client.email or "N/A"}' if occupation.client else ''
+    agent_name = f'{occupation.agent.prenom or ""} {occupation.agent.nom or ""}'.strip() if occupation.agent else 'N/A'
+    owner_name = 'N/A'
+    owner_contact = ''
+    if occupation.propriete and occupation.propriete.proprietaire:
+        o = occupation.propriete.proprietaire
+        owner_name = f'{o.prenom or ""} {o.nom or ""}'.strip()
+        owner_contact = f'T\u00e9l: {o.telephone or "N/A"} | Email: {o.email or "N/A"}'
+
+    parties_data = [
+        [Paragraph('Locataire :', bold_style), Paragraph(f'<b>{client_name}</b><br/>{client_contact}', normal_style)],
+        [Paragraph('Propri\u00e9taire :', bold_style), Paragraph(f'<b>{owner_name}</b><br/>{owner_contact}', normal_style)],
+        [Paragraph('Agent responsable :', bold_style), Paragraph(f'<b>{agent_name}</b>', normal_style)],
+    ]
+    parties_table = Table(parties_data, colWidths=[180, 350])
+    parties_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('PADDING', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ]))
+    story.append(parties_table)
+    story.append(Spacer(1, 10))
+
+    # 3. Bien
+    story.append(Paragraph('3. Bien immobilier', section_style))
+    p = occupation.propriete
+    bien_text = f'{p.titre}<br/>{p.adresse}, {p.ville}<br/>Type: {p.type_bien} | R\u00e9f: {p.reference_bien}' if p else 'N/A'
+    bien_data = [
+        [Paragraph('Bien :', bold_style), Paragraph(bien_text, normal_style)],
+    ]
+    bien_table = Table(bien_data, colWidths=[180, 350])
+    bien_table.setStyle(TableStyle([
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+        ('PADDING', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(bien_table)
+    story.append(Spacer(1, 10))
+
+    # 4. Contrat
+    story.append(Paragraph('4. Contrat de bail', section_style))
+    c = occupation.contrat
+    if c:
+        contrat_data = [
+            [Paragraph('N\u00b0 Contrat :', bold_style), Paragraph(c.numero_contrat, normal_style)],
+            [Paragraph('Date signature :', bold_style),
+             Paragraph(c.date_signature.strftime('%d/%m/%Y') if c.date_signature else '--', normal_style)],
+            [Paragraph('Loyer :', bold_style), Paragraph(format_currency_pdf(c.montant_loyer, 'EUR') if c.montant_loyer else '--', bold_style)],
+            [Paragraph('D\u00e9p\u00f4t garantie :', bold_style), Paragraph(format_currency_pdf(c.depot_garantie, 'EUR') if c.depot_garantie else '--', normal_style)],
+            [Paragraph('Mode de paiement :', bold_style), Paragraph(c.mode_paiement or '--', normal_style)],
+            [Paragraph('Fr\u00e9quence :', bold_style), Paragraph(c.frequence or '--', normal_style)],
+        ]
+        contrat_table = Table(contrat_data, colWidths=[180, 350])
+        contrat_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+            ('PADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        story.append(contrat_table)
+    else:
+        story.append(Paragraph('Aucun contrat associ\u00e9.', normal_style))
+    story.append(Spacer(1, 10))
+
+    # 5. Occupants
+    story.append(Paragraph(f'5. Occupants ({occupation.nombre_occupants})', section_style))
+    occupants = occupation.occupants.all()
+    if occupants:
+        occ_data = [[Paragraph('Nom', bold_style), Paragraph('Pr\u00e9nom', bold_style),
+                     Paragraph('Lien', bold_style), Paragraph('T\u00e9l', bold_style)]]
+        for o in occupants:
+            occ_data.append([
+                Paragraph(o.nom or '', normal_style),
+                Paragraph(o.prenom or '', normal_style),
+                Paragraph(o.lien_locataire or '', normal_style),
+                Paragraph(o.telephone or '', normal_style),
+            ])
+        occ_table = Table(occ_data, colWidths=[120, 120, 120, 170])
+        occ_table.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
+            ('PADDING', (0, 0), (-1, -1), 5),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e293b')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ]))
+        story.append(occ_table)
+    else:
+        story.append(Paragraph('Aucun occupant suppl\u00e9mentaire.', normal_style))
+
+    story.append(Spacer(1, 20))
+    # Signature box
+    sig_data = [
+        [Paragraph('<b>Signature Agent</b>', bold_style), Paragraph('<b>Signature Locataire</b>', bold_style)],
+        ['\n\n\n_________________________', '\n\n\n_________________________']
+    ]
+    sig_table = Table(sig_data, colWidths=[265, 265])
+    sig_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 1), (-1, 1), 20),
+    ]))
+    story.append(sig_table)
+    story.append(Spacer(1, 40))
+    story.append(Paragraph(
+        'Ciento Immobilier \u2014 Document confidentiel g\u00e9n\u00e9r\u00e9 automatiquement en local.',
+        footer_style
+    ))
+
     doc.build(story)
     buffer.seek(0)
     return buffer

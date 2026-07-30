@@ -1,10 +1,16 @@
+import logging
+import traceback
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file
 from flask_login import login_required, current_user
 from app.models import BienAirbnb, ReservationAirbnb, Proprietaire, Utilisateur
 from app.utils.helpers import log_activity, sanitize_search, role_required
 from app.services.pdf_service import generate_airbnb_sheet_pdf
+from sqlalchemy.orm import joinedload
+from sqlalchemy import select, func as sa_func
 from app import db
 from datetime import datetime, date, timezone
+
+logger = logging.getLogger(__name__)
 
 airbnb = Blueprint('airbnb', __name__)
 
@@ -14,37 +20,48 @@ def list_biens():
     search = request.args.get('search', '')
     statut_filter = request.args.get('statut', '')
     ville_filter = request.args.get('ville', '')
-    
-    query = BienAirbnb.query
-    
+    sort = request.args.get('sort', 'date_ajout')
+    order = request.args.get('order', 'desc')
+    per_page = request.args.get('per_page', 20, type=int)
+
+    stmt = select(BienAirbnb).options(joinedload(BienAirbnb.proprietaire_airbnb))
+
     if search:
         safe_search = sanitize_search(search)
         like_pattern = f'%{safe_search}%'
-        query = query.filter(
+        stmt = stmt.where(
             (BienAirbnb.titre.ilike(like_pattern)) |
             (BienAirbnb.reference.ilike(like_pattern)) |
             (BienAirbnb.ville.ilike(like_pattern)) |
             (BienAirbnb.quartier.ilike(like_pattern))
         )
     if statut_filter:
-        query = query.filter(BienAirbnb.statut == statut_filter)
+        stmt = stmt.where(BienAirbnb.statut == statut_filter)
     if ville_filter:
-        query = query.filter(BienAirbnb.ville.ilike(f'%{sanitize_search(ville_filter)}%'))
-    
-    biens = query.order_by(BienAirbnb.date_ajout.desc()).all()
-    
+        stmt = stmt.where(BienAirbnb.ville.ilike(f'%{sanitize_search(ville_filter)}%'))
+
+    page = request.args.get('page', 1, type=int)
+    sort_column = getattr(BienAirbnb, sort, None)
+    if sort_column is None:
+        sort_column = BienAirbnb.date_ajout
+        order = 'desc'
+    stmt = stmt.order_by(sort_column.asc() if order == 'asc' else sort_column.desc())
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
+    biens = pagination.items
+
     # Statistiques rapides
-    total_biens = BienAirbnb.query.count()
-    biens_actifs = BienAirbnb.query.filter_by(statut='Actif').count()
-    reservations_mois = ReservationAirbnb.query.filter(
+    total_biens = db.session.execute(select(sa_func.count(BienAirbnb.id))).scalar()
+    biens_actifs = db.session.execute(select(sa_func.count(BienAirbnb.id)).where(BienAirbnb.statut == 'Actif')).scalar()
+    reservations_mois = db.session.execute(select(sa_func.count(ReservationAirbnb.id)).where(
         ReservationAirbnb.statut.in_(['Confirmée', 'Terminée']),
         db.extract('month', ReservationAirbnb.date_arrivee) == date.today().month,
         db.extract('year', ReservationAirbnb.date_arrivee) == date.today().year
-    ).count()
-    
-    return render_template('airbnb/list.html', 
-                         biens=biens, search=search, 
+    )).scalar()
+
+    return render_template('airbnb/list.html',
+                         biens=biens, pagination=pagination, search=search,
                          statut=statut_filter, ville=ville_filter,
+                         sort=sort, order=order, per_page=per_page,
                          total_biens=total_biens, biens_actifs=biens_actifs,
                          reservations_mois=reservations_mois)
 
@@ -54,7 +71,7 @@ def list_biens():
 def add_bien():
     if request.method == 'POST':
         # Génération de la référence unique
-        count = BienAirbnb.query.count()
+        count = db.session.execute(select(sa_func.count(BienAirbnb.id))).scalar()
         reference = f"AIR-{datetime.now(timezone.utc).year}-{count + 1:04d}"
         
         new_bien = BienAirbnb(
@@ -84,23 +101,27 @@ def add_bien():
         
         try:
             db.session.add(new_bien)
-            db.session.commit()
             log_activity(current_user.id, f"Création bien AirBNB: {new_bien.titre}", "biens_airbnb", new_bien.id)
+            db.session.commit()
             flash(f"Le bien AirBNB « {new_bien.titre} » a été créé (Réf: {reference}).", "success")
             return redirect(url_for('airbnb.view_bien', bien_id=new_bien.id))
         except Exception as e:
             db.session.rollback()
-            flash("Erreur lors de la création. Veuillez réessayer.", "danger")
+            logger.error(f"[AIRBNB] Échec création bien par user_id={current_user.id}: {e}")
+            logger.error(traceback.format_exc())
+            flash("Erreur lors de la création du bien. Veuillez réessayer.", "danger")
     
-    proprietaires = Proprietaire.query.order_by(Proprietaire.nom.asc()).all()
-    agents = Utilisateur.query.filter_by(role='Agent immobilier', actif=True).order_by(Utilisateur.nom.asc()).all()
+    proprietaires = db.session.execute(select(Proprietaire).order_by(Proprietaire.nom.asc())).scalars().all()
+    agents = db.session.execute(select(Utilisateur).where(Utilisateur.role == 'Agent immobilier', Utilisateur.actif == True).order_by(Utilisateur.nom.asc())).scalars().all()
     return render_template('airbnb/form.html', bien=None, proprietaires=proprietaires, agents=agents, action_title="Ajouter un bien AirBNB")
 
 @airbnb.route('/modifier/<int:bien_id>', methods=['GET', 'POST'])
 @login_required
 @role_required('Agent immobilier', 'Assistant')
 def edit_bien(bien_id):
-    bien = BienAirbnb.query.get_or_404(bien_id)
+    bien = db.session.get(BienAirbnb, bien_id)
+    if bien is None:
+        abort(404)
     
     if request.method == 'POST':
         bien.titre = request.form.get('titre')
@@ -127,28 +148,48 @@ def edit_bien(bien_id):
         bien.observations = request.form.get('observations')
         
         try:
-            db.session.commit()
             log_activity(current_user.id, f"Modification bien AirBNB: {bien.titre}", "biens_airbnb", bien.id)
+            db.session.commit()
             flash(f"Le bien « {bien.titre} » a été mis à jour.", "success")
             return redirect(url_for('airbnb.view_bien', bien_id=bien.id))
         except Exception as e:
             db.session.rollback()
+            logger.error(f"[AIRBNB] Échec modification bien id={bien_id} par user_id={current_user.id}: {e}")
+            logger.error(traceback.format_exc())
             flash("Erreur lors de la modification. Veuillez réessayer.", "danger")
     
-    proprietaires = Proprietaire.query.order_by(Proprietaire.nom.asc()).all()
-    agents = Utilisateur.query.filter_by(role='Agent immobilier', actif=True).order_by(Utilisateur.nom.asc()).all()
+    proprietaires = db.session.execute(select(Proprietaire).order_by(Proprietaire.nom.asc())).scalars().all()
+    agents = db.session.execute(select(Utilisateur).where(Utilisateur.role == 'Agent immobilier', Utilisateur.actif == True).order_by(Utilisateur.nom.asc())).scalars().all()
     return render_template('airbnb/form.html', bien=bien, proprietaires=proprietaires, agents=agents, action_title=f"Modifier {bien.titre}")
 
 @airbnb.route('/details/<int:bien_id>')
 @login_required
 def view_bien(bien_id):
-    bien = BienAirbnb.query.get_or_404(bien_id)
+    bien = db.session.get(BienAirbnb, bien_id)
+    if bien is None:
+        abort(404)
     
-    # Statistiques du bien
-    total_reservations = len(bien.reservations)
-    reservations_confirmees = sum(1 for r in bien.reservations if r.statut in ['Confirmée', 'Terminée'])
-    revenus_total = sum(float(r.montant_net or r.montant_total or 0) for r in bien.reservations if r.statut in ['Confirmée', 'Terminée'])
-    nuits_total = sum(r.nombre_nuits or 0 for r in bien.reservations if r.statut in ['Confirmée', 'Terminée'])
+    # Statistiques du bien via SQL
+    total_reservations = db.session.execute(select(sa_func.count(ReservationAirbnb.id)).where(ReservationAirbnb.bien_airbnb_id == bien_id)).scalar() or 0
+    
+    reservations_confirmees = db.session.execute(select(sa_func.count(ReservationAirbnb.id)).where(
+        ReservationAirbnb.bien_airbnb_id == bien_id,
+        ReservationAirbnb.statut.in_(['Confirmée', 'Terminée'])
+    )).scalar() or 0
+    
+    revenus_total = db.session.execute(select(
+        sa_func.sum(sa_func.coalesce(ReservationAirbnb.montant_net, ReservationAirbnb.montant_total, 0))
+    ).where(
+        ReservationAirbnb.bien_airbnb_id == bien_id,
+        ReservationAirbnb.statut.in_(['Confirmée', 'Terminée'])
+    )).scalar() or 0
+    
+    nuits_total = db.session.execute(select(
+        sa_func.sum(sa_func.coalesce(ReservationAirbnb.nombre_nuits, 0))
+    ).where(
+        ReservationAirbnb.bien_airbnb_id == bien_id,
+        ReservationAirbnb.statut.in_(['Confirmée', 'Terminée'])
+    )).scalar() or 0
     
     return render_template('airbnb/view.html', bien=bien,
                          total_reservations=total_reservations,
@@ -158,20 +199,22 @@ def view_bien(bien_id):
 
 @airbnb.route('/supprimer/<int:bien_id>', methods=['POST'])
 @login_required
+@role_required('Administrateur', 'Directeur')
 def delete_bien(bien_id):
-    if current_user.role not in ['Administrateur', 'Directeur']:
-        abort(403)
-    
-    bien = BienAirbnb.query.get_or_404(bien_id)
+    bien = db.session.get(BienAirbnb, bien_id)
+    if bien is None:
+        abort(404)
     titre = bien.titre
     
     try:
         db.session.delete(bien)
-        db.session.commit()
         log_activity(current_user.id, f"Suppression bien AirBNB: {titre}", "biens_airbnb", bien_id)
+        db.session.commit()
         flash(f"Le bien « {titre} » a été supprimé.", "success")
     except Exception as e:
         db.session.rollback()
+        logger.error(f"[AIRBNB] Échec suppression bien id={bien_id} par user_id={current_user.id}: {e}")
+        logger.error(traceback.format_exc())
         flash("Impossible de supprimer ce bien. Veuillez réessayer.", "danger")
     
     return redirect(url_for('airbnb.list_biens'))
@@ -180,7 +223,9 @@ def delete_bien(bien_id):
 @login_required
 @role_required('Agent immobilier', 'Assistant')
 def add_reservation(bien_id):
-    bien = BienAirbnb.query.get_or_404(bien_id)
+    bien = db.session.get(BienAirbnb, bien_id)
+    if bien is None:
+        abort(404)
     
     try:
         date_arrivee = datetime.strptime(request.form.get('date_arrivee', ''), '%Y-%m-%d').date()
@@ -191,6 +236,10 @@ def add_reservation(bien_id):
 
     if date_depart <= date_arrivee:
         flash("La date de départ doit être postérieure à la date d'arrivée.", "danger")
+        return redirect(url_for('airbnb.view_bien', bien_id=bien_id))
+
+    if date_arrivee < date.today():
+        flash("La date d'arrivée ne peut pas être dans le passé.", "danger")
         return redirect(url_for('airbnb.view_bien', bien_id=bien_id))
 
     nombre_nuits = (date_depart - date_arrivee).days
@@ -218,11 +267,13 @@ def add_reservation(bien_id):
     
     try:
         db.session.add(new_reservation)
-        db.session.commit()
         log_activity(current_user.id, f"Nouvelle réservation AirBNB pour {bien.titre}: {new_reservation.nom_voyageur}", "reservations_airbnb", new_reservation.id)
+        db.session.commit()
         flash(f"Réservation de {new_reservation.nom_voyageur} enregistrée ({nombre_nuits} nuits).", "success")
     except Exception as e:
         db.session.rollback()
+        logger.error(f"[AIRBNB] Échec création réservation pour bien_id={bien_id}: {e}")
+        logger.error(traceback.format_exc())
         flash("Erreur lors de l'enregistrement de la réservation. Veuillez réessayer.", "danger")
     
     return redirect(url_for('airbnb.view_bien', bien_id=bien_id))
@@ -230,29 +281,43 @@ def add_reservation(bien_id):
 @airbnb.route('/reservation/supprimer/<int:reservation_id>', methods=['POST'])
 @login_required
 def delete_reservation(reservation_id):
-    reservation = ReservationAirbnb.query.get_or_404(reservation_id)
+    reservation = db.session.get(ReservationAirbnb, reservation_id)
+    if reservation is None:
+        abort(404)
     bien_id = reservation.bien_airbnb_id
     
     try:
         db.session.delete(reservation)
-        db.session.commit()
         log_activity(current_user.id, "Suppression réservation AirBNB", "reservations_airbnb", reservation_id)
+        db.session.commit()
         flash("Réservation supprimée.", "info")
     except Exception as e:
         db.session.rollback()
-        flash("Erreur lors de la suppression. Veuillez réessayer.", "danger")
+        logger.error(f"[AIRBNB] Échec suppression réservation id={reservation_id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de la suppression de la réservation. Veuillez réessayer.", "danger")
     
     return redirect(url_for('airbnb.view_bien', bien_id=bien_id))
 
 @airbnb.route('/telecharger-pdf/<int:bien_id>')
 @login_required
 def download_airbnb_pdf(bien_id):
-    bien = BienAirbnb.query.get_or_404(bien_id)
-    pdf_buffer = generate_airbnb_sheet_pdf(bien)
-    log_activity(current_user.id, f"Génération PDF Fiche AirBNB {bien.reference}", "biens_airbnb", bien.id)
-    return send_file(
-        pdf_buffer,
-        mimetype="application/pdf",
-        as_attachment=True,
-        download_name=f"Fiche_AirBNB_{bien.reference}.pdf"
-    )
+    try:
+        bien = db.session.get(BienAirbnb, bien_id)
+        if bien is None:
+            abort(404)
+        pdf_buffer = generate_airbnb_sheet_pdf(bien)
+        log_activity(current_user.id, f"Génération PDF Fiche AirBNB {bien.reference}", "biens_airbnb", bien.id)
+        db.session.commit()
+        return send_file(
+            pdf_buffer,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"Fiche_AirBNB_{bien.reference}.pdf"
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[AIRBNB] Échec génération PDF bien_id={bien_id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de la génération du PDF. Veuillez réessayer.", "danger")
+        return redirect(url_for('airbnb.list_biens'))

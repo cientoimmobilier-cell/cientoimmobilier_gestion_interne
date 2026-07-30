@@ -1,9 +1,11 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, send_file, jsonify
+from sqlalchemy import select, func as sa_func
 from flask_login import login_required, current_user
 from app.models import Client, DemandeClient
 from app.utils.helpers import log_activity, sanitize_search, role_required
 from app import db
 from datetime import datetime, timezone
+from markupsafe import Markup, escape
 import time
 import logging
 import traceback
@@ -16,22 +18,36 @@ clients = Blueprint('clients', __name__)
 @clients.route('/')
 @login_required
 def list_clients():
-    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    search = request.args.get('search', '').strip()
+    sort = request.args.get('sort', 'nom')
+    order = request.args.get('order', 'asc')
+
+    stmt = select(Client)
+
     if search:
-        # Recherche par nom, prenom, email, telephone ou code_client
         safe_search = sanitize_search(search)
         like_pattern = f'%{safe_search}%'
-        clients_list = Client.query.filter(
-            (Client.nom.ilike(like_pattern)) |
-            (Client.prenom.ilike(like_pattern)) |
-            (Client.email.ilike(like_pattern)) |
-            (Client.telephone.ilike(like_pattern)) |
-            (Client.code_client.ilike(like_pattern))
-        ).order_by(Client.nom.asc()).all()
-    else:
-        clients_list = Client.query.order_by(Client.nom.asc()).all()
-        
-    return render_template('clients/list.html', clients=clients_list, search=search)
+        stmt = stmt.where(
+            db.or_(
+                Client.nom.ilike(like_pattern),
+                Client.prenom.ilike(like_pattern),
+                Client.email.ilike(like_pattern),
+                Client.telephone.ilike(like_pattern),
+                Client.code_client.ilike(like_pattern)
+            )
+        )
+
+    sort_column = getattr(Client, sort, Client.nom)
+    try:
+        stmt = stmt.order_by(sort_column.asc() if order == 'asc' else sort_column.desc())
+    except:
+        stmt = stmt.order_by(Client.nom.asc())
+
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
+
+    return render_template('clients/list.html', pagination=pagination, search=search, sort=sort, order=order)
 
 @clients.route('/ajouter', methods=['GET', 'POST'])
 @login_required
@@ -57,22 +73,32 @@ def add_client():
         # --- Vérification des doublons ---
         doublon = None
         if telephone:
-            doublon = Client.query.filter(Client.telephone == telephone).first()
+            doublon = db.session.execute(select(Client).where(Client.telephone == telephone)).scalars().first()
             if doublon:
-                flash(f"⚠️ Doublon détecté : le téléphone <strong>{telephone}</strong> est déjà enregistré pour "
-                      f"<a href='{url_for('clients.view_client', client_id=doublon.id)}' class='alert-link'>"
-                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                # Markup() + escape() : les données de la DB sont explicitement
+                # échappées avant insertion dans le HTML — zéro XSS possible.
+                url = url_for('clients.view_client', client_id=doublon.id)
+                flash(Markup(
+                    f"⚠️ Doublon détecté : le téléphone "
+                    f"<strong>{escape(telephone)}</strong> est déjà enregistré pour "
+                    f"<a href='{url}' class='alert-link'>"
+                    f"{escape(doublon.prenom)} {escape(doublon.nom)}</a>."
+                ), "danger")
                 return render_template('clients/form.html', client=None, action_title="Ajouter un client")
         if email:
-            doublon = Client.query.filter(Client.email == email.lower()).first()
+            doublon = db.session.execute(select(Client).where(Client.email == email.lower())).scalars().first()
             if doublon:
-                flash(f"⚠️ Doublon détecté : l'e-mail <strong>{email}</strong> est déjà enregistré pour "
-                      f"<a href='{url_for('clients.view_client', client_id=doublon.id)}' class='alert-link'>"
-                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                url = url_for('clients.view_client', client_id=doublon.id)
+                flash(Markup(
+                    f"⚠️ Doublon détecté : l’e-mail "
+                    f"<strong>{escape(email)}</strong> est déjà enregistré pour "
+                    f"<a href='{url}' class='alert-link'>"
+                    f"{escape(doublon.prenom)} {escape(doublon.nom)}</a>."
+                ), "danger")
                 return render_template('clients/form.html', client=None, action_title="Ajouter un client")
 
         # Génération du code client unique (timestamp + count pour éviter collision)
-        count = Client.query.count()
+        count = db.session.execute(select(sa_func.count(Client.id))).scalar()
         ts_suffix = str(int(time.time() * 1000))[-4:]
         code_client = f"CLI-{datetime.now(timezone.utc).year}-{count + 1:04d}-{ts_suffix}"
         
@@ -105,8 +131,8 @@ def add_client():
         
         try:
             db.session.add(new_client)
-            db.session.commit()
             log_activity(current_user.id, f"Création client: {new_client.prenom} {new_client.nom}", "clients", new_client.id)
+            db.session.commit()
             flash(f"Le client {new_client.prenom} {new_client.nom} a été créé avec succès (Code: {code_client}).", "success")
             return redirect(url_for('clients.view_client', client_id=new_client.id))
         except Exception as e:
@@ -129,7 +155,9 @@ def add_client():
 @login_required
 @role_required('Agent immobilier', 'Assistant')
 def edit_client(client_id):
-    client_obj = Client.query.get_or_404(client_id)
+    client_obj = db.session.get(Client, client_id)
+    if client_obj is None:
+        abort(404)
     
     if request.method == 'POST':
         new_telephone = request.form.get('telephone')
@@ -137,18 +165,26 @@ def edit_client(client_id):
 
         # --- Vérification des doublons (exclure l'enregistrement courant) ---
         if new_telephone:
-            doublon = Client.query.filter(Client.telephone == new_telephone, Client.id != client_id).first()
+            doublon = db.session.execute(select(Client).where(Client.telephone == new_telephone, Client.id != client_id)).scalars().first()
             if doublon:
-                flash(f"⚠️ Doublon détecté : le téléphone <strong>{new_telephone}</strong> est déjà enregistré pour "
-                      f"<a href='{url_for('clients.view_client', client_id=doublon.id)}' class='alert-link'>"
-                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                url = url_for('clients.view_client', client_id=doublon.id)
+                flash(Markup(
+                    f"⚠️ Doublon détecté : le téléphone "
+                    f"<strong>{escape(new_telephone)}</strong> est déjà enregistré pour "
+                    f"<a href='{url}' class='alert-link'>"
+                    f"{escape(doublon.prenom)} {escape(doublon.nom)}</a>."
+                ), "danger")
                 return render_template('clients/form.html', client=client_obj, action_title=f"Modifier {client_obj.prenom} {client_obj.nom}")
         if new_email:
-            doublon = Client.query.filter(Client.email == new_email.lower(), Client.id != client_id).first()
+            doublon = db.session.execute(select(Client).where(Client.email == new_email.lower(), Client.id != client_id)).scalars().first()
             if doublon:
-                flash(f"⚠️ Doublon détecté : l'e-mail <strong>{new_email}</strong> est déjà enregistré pour "
-                      f"<a href='{url_for('clients.view_client', client_id=doublon.id)}' class='alert-link'>"
-                      f"{doublon.prenom} {doublon.nom}</a>.", "danger")
+                url = url_for('clients.view_client', client_id=doublon.id)
+                flash(Markup(
+                    f"⚠️ Doublon détecté : l’e-mail "
+                    f"<strong>{escape(new_email)}</strong> est déjà enregistré pour "
+                    f"<a href='{url}' class='alert-link'>"
+                    f"{escape(doublon.prenom)} {escape(doublon.nom)}</a>."
+                ), "danger")
                 return render_template('clients/form.html', client=client_obj, action_title=f"Modifier {client_obj.prenom} {client_obj.nom}")
 
         nom_edit = request.form.get('nom', '').strip()
@@ -173,8 +209,8 @@ def edit_client(client_id):
         client_obj.observations = request.form.get('observations')
         
         try:
-            db.session.commit()
             log_activity(current_user.id, f"Modification client: {client_obj.prenom} {client_obj.nom}", "clients", client_obj.id)
+            db.session.commit()
             flash(f"Les informations de {client_obj.prenom} {client_obj.nom} ont été mises à jour.", "success")
             return redirect(url_for('clients.view_client', client_id=client_obj.id))
         except Exception as e:
@@ -191,23 +227,34 @@ def edit_client(client_id):
 @clients.route('/details/<int:client_id>')
 @login_required
 def view_client(client_id):
-    client_obj = Client.query.get_or_404(client_id)
+    client_obj = db.session.get(Client, client_id)
+    if client_obj is None:
+        abort(404)
     return render_template('clients/view.html', client=client_obj)
 
 @clients.route('/supprimer/<int:client_id>', methods=['POST'])
 @login_required
+@role_required('Administrateur', 'Directeur')
 def delete_client(client_id):
-    # Restreint aux administrateurs ou directeurs
-    if current_user.role not in ['Administrateur', 'Directeur']:
-        abort(403)
-        
-    client_obj = Client.query.get_or_404(client_id)
+    client_obj = db.session.get(Client, client_id)
+    if client_obj is None:
+        abort(404)
     nom_complet = f"{client_obj.prenom} {client_obj.nom}"
+    
+    # Vérifier les dépendances avant suppression
+    transactions_actives = [t for t in client_obj.transactions if t.statut != 'Annulée']
+    if transactions_actives:
+        flash(
+            f"Impossible de supprimer {nom_complet} : {len(transactions_actives)} transaction(s) active(s) "
+            f"lui sont associées. Annulez d'abord ces transactions.",
+            "danger"
+        )
+        return redirect(url_for('clients.view_client', client_id=client_id))
     
     try:
         db.session.delete(client_obj)
-        db.session.commit()
         log_activity(current_user.id, f"Suppression client: {nom_complet}", "clients", client_id)
+        db.session.commit()
         flash(f"Le client {nom_complet} a été supprimé.", "success")
     except Exception as e:
         db.session.rollback()
@@ -216,14 +263,16 @@ def delete_client(client_id):
             f"par user_id={current_user.id} — {type(e).__name__}: {e}"
         )
         logger.error(traceback.format_exc())
-        flash(f"Impossible de supprimer ce client : {type(e).__name__}. Consultez les logs.", "danger")
+        flash(f"Impossible de supprimer ce client. Consultez les logs serveur.", "danger")
         
     return redirect(url_for('clients.list_clients'))
 
 @clients.route('/demande/ajouter/<int:client_id>', methods=['POST'])
 @login_required
 def add_demande(client_id):
-    client_obj = Client.query.get_or_404(client_id)
+    client_obj = db.session.get(Client, client_id)
+    if client_obj is None:
+        abort(404)
     
     type_operation = request.form.get('type_operation')
     type_bien = request.form.get('type_bien')
@@ -249,28 +298,35 @@ def add_demande(client_id):
     
     try:
         db.session.add(new_demande)
-        db.session.commit()
+        db.session.flush()
         log_activity(current_user.id, f"Ajout critères de recherche pour {client_obj.prenom} {client_obj.nom}", "demandes_clients", new_demande.id)
+        db.session.commit()
         flash("Les critères de recherche ont été ajoutés pour ce client.", "success")
     except Exception as e:
         db.session.rollback()
-        flash("Erreur d'ajout de critères. Veuillez réessayer.", "danger")
+        logger.error(f"[CLIENTS] Échec ajout demande pour client_id={client_id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de l'ajout des critères de recherche. Veuillez réessayer.", "danger")
         
     return redirect(url_for('clients.view_client', client_id=client_id))
 
 @clients.route('/demande/supprimer/<int:demande_id>', methods=['POST'])
 @login_required
 def delete_demande(demande_id):
-    demande = DemandeClient.query.get_or_404(demande_id)
+    demande = db.session.get(DemandeClient, demande_id)
+    if demande is None:
+        abort(404)
     client_id = demande.client_id
     
     try:
         db.session.delete(demande)
-        db.session.commit()
         log_activity(current_user.id, "Suppression de critères de recherche", "demandes_clients", demande_id)
+        db.session.commit()
         flash("Critères de recherche retirés.", "info")
     except Exception as e:
         db.session.rollback()
+        logger.error(f"[CLIENTS] Échec suppression demande id={demande_id}: {e}")
+        logger.error(traceback.format_exc())
         flash("Erreur lors de la suppression de critères. Veuillez réessayer.", "danger")
         
     return redirect(url_for('clients.view_client', client_id=client_id))
@@ -279,59 +335,70 @@ def delete_demande(demande_id):
 @login_required
 def verifier_doublon_client():
     """Route AJAX — vérifie si un téléphone ou email est déjà utilisé par un autre client."""
-    telephone = request.args.get('telephone', '').strip()
-    email = request.args.get('email', '').strip().lower()
-    exclude_id = request.args.get('exclude_id', type=int)  # ID de l'enregistrement en cours de modification
+    try:
+        telephone = request.args.get('telephone', '').strip()
+        email = request.args.get('email', '').strip().lower()
+        exclude_id = request.args.get('exclude_id', type=int)
 
-    if telephone:
-        q = Client.query.filter(Client.telephone == telephone)
-        if exclude_id:
-            q = q.filter(Client.id != exclude_id)
-        doublon = q.first()
-        if doublon:
-            return jsonify({
-                'doublon': True,
-                'champ': 'telephone',
-                'nom': f"{doublon.prenom} {doublon.nom}",
-                'url': url_for('clients.view_client', client_id=doublon.id)
-            })
+        if telephone:
+            stmt = select(Client).where(Client.telephone == telephone)
+            if exclude_id:
+                stmt = stmt.where(Client.id != exclude_id)
+            doublon = db.session.execute(stmt).scalars().first()
+            if doublon:
+                return jsonify({
+                    'doublon': True,
+                    'champ': 'telephone',
+                    'nom': f"{doublon.prenom} {doublon.nom}",
+                    'url': url_for('clients.view_client', client_id=doublon.id)
+                })
 
-    if email:
-        q = Client.query.filter(Client.email == email)
-        if exclude_id:
-            q = q.filter(Client.id != exclude_id)
-        doublon = q.first()
-        if doublon:
-            return jsonify({
-                'doublon': True,
-                'champ': 'email',
-                'nom': f"{doublon.prenom} {doublon.nom}",
-                'url': url_for('clients.view_client', client_id=doublon.id)
-            })
+        if email:
+            stmt = select(Client).where(Client.email == email)
+            if exclude_id:
+                stmt = stmt.where(Client.id != exclude_id)
+            doublon = db.session.execute(stmt).scalars().first()
+            if doublon:
+                return jsonify({
+                    'doublon': True,
+                    'champ': 'email',
+                    'nom': f"{doublon.prenom} {doublon.nom}",
+                    'url': url_for('clients.view_client', client_id=doublon.id)
+                })
 
-    return jsonify({'doublon': False})
+        return jsonify({'doublon': False})
+    except Exception as e:
+        logger.error(f"[CLIENTS] Erreur vérification doublon: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'doublon': False, 'error': 'Erreur interne'}), 500
 
 
 @clients.route('/exporter')
 @login_required
 @role_required('Agent immobilier', 'Assistant')
 def export_clients():
-    clients_list = Client.query.order_by(Client.nom.asc()).all()
-    excel_file = export_clients_to_excel(clients_list)
-    log_activity(current_user.id, "Exportation Excel du portefeuille clients", "clients")
-    return send_file(
-        excel_file,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name="Portefeuille_Clients.xlsx"
-    )
+    try:
+        clients_list = db.session.execute(select(Client).order_by(Client.nom.asc())).scalars().all()
+        excel_file = export_clients_to_excel(clients_list)
+        log_activity(current_user.id, "Exportation Excel du portefeuille clients", "clients")
+        db.session.commit()
+        return send_file(
+            excel_file,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name="Portefeuille_Clients.xlsx"
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[CLIENTS] Échec export Excel par user_id={current_user.id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de l'exportation. Veuillez réessayer.", "danger")
+        return redirect(url_for('clients.list_clients'))
 
 @clients.route('/importer', methods=['POST'])
 @login_required
+@role_required('Administrateur', 'Directeur')
 def import_clients():
-    if current_user.role not in ['Administrateur', 'Directeur']:
-        abort(403)
-        
     if 'excel_file' not in request.files:
         flash("Aucun fichier envoyé.", "warning")
         return redirect(url_for('clients.list_clients'))
@@ -349,7 +416,7 @@ def import_clients():
         for data in clients_data:
             existing = None
             if data["email"]:
-                existing = Client.query.filter_by(email=data["email"]).first()
+                existing = db.session.execute(select(Client).where(Client.email == data["email"])).scalars().first()
                 
             if existing:
                 existing.nom = data["nom"]
@@ -368,7 +435,7 @@ def import_clients():
                 existing.observations = data["observations"]
                 updated_count += 1
             else:
-                count = Client.query.count()
+                count = db.session.execute(select(sa_func.count(Client.id))).scalar()
                 code_client = f"CLI-{datetime.now(timezone.utc).year}-{count + 1:04d}"
                 
                 new_client = Client(
@@ -393,11 +460,13 @@ def import_clients():
                 db.session.flush()
                 imported_count += 1
                 
-        db.session.commit()
         log_activity(current_user.id, f"Importation Excel clients : {imported_count} créés, {updated_count} mis à jour", "clients")
+        db.session.commit()
         flash(f"Importation réussie : {imported_count} clients créés, {updated_count} fiches mises à jour.", "success")
     except Exception as e:
         db.session.rollback()
-        flash("Erreur lors de l'importation. Vérifiez le format du fichier.", "danger")
+        logger.error(f"[CLIENTS] Échec import Excel par user_id={current_user.id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de l'importation. Vérifiez le format du fichier Excel.", "danger")
         
     return redirect(url_for('clients.list_clients'))

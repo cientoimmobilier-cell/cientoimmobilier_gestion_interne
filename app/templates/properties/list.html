@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from '_search_filters.html' import sort_link, search_form %}
+{% from '_pagination.html' import render_pagination %}
 
 {% block title %}Biens Immobiliers - Ciento Immobilier{% endblock %}
 {% block header_title %}Catalogue Immobilier{% endblock %}
@@ -51,6 +53,8 @@
         </div>
     </div>
 </div>
+
+{{ search_form('properties.list_properties', placeholder='Rechercher un bien...') }}
 
 <!-- Actions Toolbar -->
 <div class="row mb-4">
@@ -139,6 +143,8 @@
     </div>
     {% endfor %}
 </div>
+
+{{ render_pagination(pagination, 'properties.list_properties') }}
 
 <!-- Modal Import Excel Propriétés -->
 <div class="modal fade" id="importPropertiesModal" tabindex="-1" aria-labelledby="importPropertiesModalLabel" aria-hidden="true">

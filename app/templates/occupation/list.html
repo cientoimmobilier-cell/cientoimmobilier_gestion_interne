@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% from '_search_filters.html' import sort_link, search_form %}
+{% from '_pagination.html' import render_pagination %}
+
+{% block title %}Occupations - Ciento Immobilier{% endblock %}
+{% block header_title %}Gestion des Occupations{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h5 class="fw-bold text-dark mb-0">Liste des occupations</h5>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('occupation.export_excel') }}" class="btn btn-outline-success rounded-3">
+            <i class="fa-solid fa-file-excel me-2"></i>Exporter
+        </a>
+        {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+        <a href="{{ url_for('occupation.create_occupation') }}" class="btn btn-accent rounded-3">
+            <i class="fa-solid fa-plus me-2"></i>Nouvelle occupation
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Filtres -->
+<div class="card-premium py-3 px-4 mb-4">
+    <form method="GET" action="{{ url_for('occupation.list_occupations') }}" class="row g-3 align-items-end">
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Recherche</label>
+            <input type="text" name="search" class="form-control form-control-premium" placeholder="Client, bien, N\u00b0 occupation..." value="{{ search }}">
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Statut</label>
+            <select name="statut" class="form-select form-control-premium">
+                <option value="">Tous</option>
+                {% for s in statuts %}
+                <option value="{{ s }}" {{ 'selected' if statut == s }}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Ville</label>
+            <select name="ville" class="form-select form-control-premium">
+                <option value="">Toutes</option>
+                {% for v in villes %}
+                <option value="{{ v }}" {{ 'selected' if ville == v }}>{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Agent</label>
+            <select name="agent_id" class="form-select form-control-premium">
+                <option value="">Tous</option>
+                {% for a in agents_list %}
+                <option value="{{ a.id }}" {{ 'selected' if agent_id == a.id }}>{{ a.prenom }} {{ a.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label text-muted fw-semibold small mb-1">Propri\u00e9taire</label>
+            <select name="proprietaire_id" class="form-select form-control-premium">
+                <option value="">Tous</option>
+                {% for p in proprietaires %}
+                <option value="{{ p.id }}" {{ 'selected' if proprietaire_id == p.id }}>{{ p.prenom }} {{ p.nom }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-lg-1 col-md-12 d-flex gap-2">
+            <button type="submit" class="btn btn-premium w-100"><i class="fa-solid fa-sliders"></i></button>
+            {% if search or statut or ville or agent_id or proprietaire_id %}
+            <a href="{{ url_for('occupation.list_occupations') }}" class="btn btn-outline-secondary"><i class="fa-solid fa-arrow-rotate-left"></i></a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<div class="card-premium">
+    <div class="table-responsive">
+        <table class="table table-hover table-premium mb-0">
+            <thead>
+                <tr>
+                    <th>{{ sort_link('N\u00b0 Occupation', 'numero_occupation', sort, order, 'occupation.list_occupations') }}</th>
+                    <th>{{ sort_link('Client', 'client_id', sort, order, 'occupation.list_occupations') }}</th>
+                    <th>Bien</th>
+                    <th>Agent</th>
+                    <th>{{ sort_link('Date entr\u00e9e', 'date_entree', sort, order, 'occupation.list_occupations') }}</th>
+                    <th>{{ sort_link('Statut', 'statut', sort, order, 'occupation.list_occupations') }}</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for occ in pagination.items %}
+                <tr>
+                    <td><span class="badge bg-light text-dark font-monospace">{{ occ.numero_occupation }}</span></td>
+                    <td class="fw-semibold">{{ occ.client.prenom }} {{ occ.client.nom }}</td>
+                    <td>{{ occ.propriete.reference_bien if occ.propriete else 'N/A' }}</td>
+                    <td>{{ occ.agent.prenom if occ.agent else '' }} {{ occ.agent.nom if occ.agent else '' }}</td>
+                    <td>{{ occ.date_entree.strftime('%d/%m/%Y') if occ.date_entree else '--' }}</td>
+                    <td>
+                        {% if occ.statut == 'En pr\u00e9paration' %}
+                        <span class="badge bg-warning text-dark rounded-pill">{{ occ.statut }}</span>
+                        {% elif occ.statut == 'Active' %}
+                        <span class="badge bg-success rounded-pill">{{ occ.statut }}</span>
+                        {% elif occ.statut == 'Termin\u00e9e' %}
+                        <span class="badge bg-secondary rounded-pill">{{ occ.statut }}</span>
+                        {% elif occ.statut == 'R\u00e9sili\u00e9e' %}
+                        <span class="badge bg-danger rounded-pill">{{ occ.statut }}</span>
+                        {% else %}
+                        <span class="badge bg-light text-dark rounded-pill">{{ occ.statut }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('occupation.view_occupation', occ_id=occ.id) }}" class="btn btn-sm btn-outline-primary rounded-3" title="Voir">
+                            <i class="fa-solid fa-eye"></i>
+                        </a>
+                        {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
+                        <a href="{{ url_for('occupation.edit_occupation', occ_id=occ.id) }}" class="btn btn-sm btn-outline-secondary rounded-3" title="Modifier">
+                            <i class="fa-solid fa-pen"></i>
+                        </a>
+                        {% if current_user.role in ['Administrateur', 'Directeur'] %}
+                        <form action="{{ url_for('occupation.delete_occupation', occ_id=occ.id) }}" method="POST" class="d-inline" data-confirm="Supprimer cette occupation ?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>
+                        </form>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">Aucune occupation trouv\u00e9e.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ render_pagination(pagination, 'occupation.list_occupations') }}
+{% endblock %}

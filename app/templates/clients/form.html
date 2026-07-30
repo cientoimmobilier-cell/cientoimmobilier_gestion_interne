@@ -128,7 +128,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 (function() {
     const AJAX_URL = "{{ url_for('clients.verifier_doublon_client') }}";
     const EXCLUDE_ID = {{ client.id if client else 'null' }};

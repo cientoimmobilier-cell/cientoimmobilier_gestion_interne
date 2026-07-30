@@ -1,91 +1,89 @@
+import logging
+import traceback
 from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, current_app, send_file
 from flask_login import login_required, current_user
 from app.models import (Propriete, Proprietaire, Caracteristique, PhotoPropriete, 
                         DocumentPropriete, Visite, Client, Utilisateur)
 from app.utils.helpers import log_activity, role_required, sanitize_search, safe_path_join
+from app.utils.upload_security import (
+    validate_and_save_upload,
+    validate_excel_content,
+    check_file_size_before_read, check_blocked_extension,
+    UploadValidationError,
+    ALLOWED_IMAGES, ALLOWED_DOCUMENTS
+)
 from app import db
-from datetime import datetime, timezone
-from werkzeug.utils import secure_filename
+from sqlalchemy import select, update, func as sa_func
+from datetime import datetime, timezone, date
 import os
 from app.services.excel_service import export_properties_to_excel, import_properties_from_excel
 
+logger = logging.getLogger(__name__)
+
 properties = Blueprint('properties', __name__)
-
-ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
-ALLOWED_DOC_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'}
-
-# Magic bytes pour la validation MIME réelle des images
-IMAGE_MAGIC_BYTES = {
-    b'\xff\xd8\xff': 'jpg',       # JPEG
-    b'\x89PNG': 'png',             # PNG
-    b'GIF87a': 'gif',              # GIF87a
-    b'GIF89a': 'gif',              # GIF89a
-    b'RIFF': 'webp',               # WebP (vérification partielle)
-}
-
-def allowed_file(filename, allowed_set):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_set
-
-def validate_image_content(file_stream):
-    """Vérifie que le contenu réel du fichier correspond à une image (Fix #6)."""
-    header = file_stream.read(8)
-    file_stream.seek(0)  # Rembobiner pour le save() ultérieur
-    for magic, ext in IMAGE_MAGIC_BYTES.items():
-        if header.startswith(magic):
-            return True
-    return False
 
 @properties.route('/')
 @login_required
 def list_properties():
-    # Filtres
-    search = request.args.get('search', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    search = request.args.get('search', '').strip()
+    sort = request.args.get('sort', 'date_ajout')
+    order = request.args.get('order', 'desc')
     type_bien = request.args.get('type_bien', '')
     statut = request.args.get('statut', '')
     prix_max = request.args.get('prix_max', '')
     
-    query = Propriete.query
+    stmt = select(Propriete)
     
     if search:
         safe_search = sanitize_search(search)
         like_pattern = f'%{safe_search}%'
-        query = query.filter(
+        stmt = stmt.where(
             (Propriete.reference_bien.ilike(like_pattern)) |
             (Propriete.titre.ilike(like_pattern)) |
             (Propriete.ville.ilike(like_pattern)) |
             (Propriete.quartier.ilike(like_pattern))
         )
     if type_bien:
-        query = query.filter_by(type_bien=type_bien)
+        stmt = stmt.where(Propriete.type_bien == type_bien)
     if statut:
-        query = query.filter_by(statut=statut)
+        stmt = stmt.where(Propriete.statut == statut)
     if prix_max:
         try:
-            query = query.filter(Propriete.prix <= float(prix_max))
+            stmt = stmt.where(Propriete.prix <= float(prix_max))
         except ValueError:
             pass
-            
-    properties_list = query.order_by(Propriete.date_ajout.desc()).all()
     
-    # Charger les types de biens pour le filtre
+    sort_column = getattr(Propriete, sort, Propriete.date_ajout)
+    try:
+        stmt = stmt.order_by(sort_column.asc() if order == 'asc' else sort_column.desc())
+    except:
+        stmt = stmt.order_by(Propriete.date_ajout.desc())
+    
+    pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
+    
     property_types = ['Maison', 'Appartement', 'Terrain', 'Villa', 'Bureau', 'Local commercial', 'Entrepôt', 'Immeuble']
     
     return render_template(
         'properties/list.html', 
-        properties=properties_list,
+        pagination=pagination,
         property_types=property_types,
         search=search,
         type_bien=type_bien,
         statut=statut,
-        prix_max=prix_max
+        prix_max=prix_max,
+        sort=sort,
+        order=order,
+        per_page=per_page
     )
 
 @properties.route('/ajouter', methods=['GET', 'POST'])
 @login_required
 @role_required('Agent immobilier')
 def add_property():
-    proprietaires = Proprietaire.query.order_by(Proprietaire.nom.asc()).all()
-    caracteristiques = Caracteristique.query.order_by(Caracteristique.nom.asc()).all()
+    proprietaires = db.session.execute(select(Proprietaire).order_by(Proprietaire.nom.asc())).scalars().all()
+    caracteristiques = db.session.execute(select(Caracteristique).order_by(Caracteristique.nom.asc())).scalars().all()
     
     if request.method == 'POST':
         titre = request.form.get('titre')
@@ -108,7 +106,7 @@ def add_property():
         selected_caracs = request.form.getlist('caracteristiques')
         
         # Générer la référence unique
-        count = Propriete.query.count()
+        count = db.session.execute(select(sa_func.count(Propriete.id))).scalar()
         reference_bien = f"BIEN-{datetime.now(timezone.utc).year}-{count + 1:04d}"
         
         new_prop = Propriete(
@@ -138,12 +136,14 @@ def add_property():
                 
         try:
             db.session.add(new_prop)
-            db.session.commit()
             log_activity(current_user.id, f"Création propriété: {reference_bien}", "proprietes", new_prop.id)
+            db.session.commit()
             flash(f"La propriété {reference_bien} a été ajoutée avec succès.", "success")
             return redirect(url_for('properties.view_property', property_id=new_prop.id))
         except Exception as e:
             db.session.rollback()
+            logger.error(f"[PROPRIETES] Échec création propriété par user_id={current_user.id}: {e}")
+            logger.error(traceback.format_exc())
             flash("Erreur lors de la création de la propriété. Veuillez réessayer.", "danger")
             
     return render_template('properties/form.html', property=None, proprietaires=proprietaires, caracteristiques=caracteristiques, action_title="Ajouter une propriété")
@@ -152,9 +152,11 @@ def add_property():
 @login_required
 @role_required('Agent immobilier')
 def edit_property(property_id):
-    prop = Propriete.query.get_or_404(property_id)
-    proprietaires = Proprietaire.query.order_by(Proprietaire.nom.asc()).all()
-    caracteristiques = Caracteristique.query.order_by(Caracteristique.nom.asc()).all()
+    prop = db.session.get(Propriete, property_id)
+    if prop is None:
+        abort(404)
+    proprietaires = db.session.execute(select(Proprietaire).order_by(Proprietaire.nom.asc())).scalars().all()
+    caracteristiques = db.session.execute(select(Caracteristique).order_by(Caracteristique.nom.asc())).scalars().all()
     
     if request.method == 'POST':
         prop.titre = request.form.get('titre')
@@ -182,12 +184,14 @@ def edit_property(property_id):
                 prop.caracteristiques.append(carac)
                 
         try:
-            db.session.commit()
             log_activity(current_user.id, f"Modification propriété: {prop.reference_bien}", "proprietes", prop.id)
+            db.session.commit()
             flash(f"La propriété {prop.reference_bien} a été mise à jour.", "success")
             return redirect(url_for('properties.view_property', property_id=prop.id))
         except Exception as e:
             db.session.rollback()
+            logger.error(f"[PROPRIETES] Échec modification propriété id={property_id} par user_id={current_user.id}: {e}")
+            logger.error(traceback.format_exc())
             flash("Erreur lors de la modification. Veuillez réessayer.", "danger")
             
     return render_template('properties/form.html', property=prop, proprietaires=proprietaires, caracteristiques=caracteristiques, action_title=f"Modifier {prop.reference_bien}")
@@ -195,18 +199,20 @@ def edit_property(property_id):
 @properties.route('/details/<int:property_id>')
 @login_required
 def view_property(property_id):
-    prop = Propriete.query.get_or_404(property_id)
-    clients_list = Client.query.order_by(Client.nom.asc()).all()
-    agents_list = Utilisateur.query.filter_by(actif=True).order_by(Utilisateur.nom.asc()).all()
+    prop = db.session.get(Propriete, property_id)
+    if prop is None:
+        abort(404)
+    clients_list = db.session.execute(select(Client).order_by(Client.nom.asc())).scalars().all()
+    agents_list = db.session.execute(select(Utilisateur).where(Utilisateur.actif == True).order_by(Utilisateur.nom.asc())).scalars().all()
     return render_template('properties/view.html', property=prop, clients=clients_list, agents=agents_list)
 
 @properties.route('/supprimer/<int:property_id>', methods=['POST'])
 @login_required
+@role_required('Administrateur', 'Directeur')
 def delete_property(property_id):
-    if current_user.role not in ['Administrateur', 'Directeur']:
-        abort(403)
-        
-    prop = Propriete.query.get_or_404(property_id)
+    prop = db.session.get(Propriete, property_id)
+    if prop is None:
+        abort(404)
     ref = prop.reference_bien
     
     # Supprimer les fichiers physiques associés (avec validation de chemin)
@@ -228,11 +234,13 @@ def delete_property(property_id):
             
     try:
         db.session.delete(prop)
-        db.session.commit()
         log_activity(current_user.id, f"Suppression propriété: {ref}", "proprietes", property_id)
+        db.session.commit()
         flash(f"La propriété {ref} a été supprimée.", "success")
     except Exception as e:
         db.session.rollback()
+        logger.error(f"[PROPRIETES] Échec suppression propriété id={property_id} par user_id={current_user.id}: {e}")
+        logger.error(traceback.format_exc())
         flash("Erreur lors de la suppression. Veuillez réessayer.", "danger")
         
     return redirect(url_for('properties.list_properties'))
@@ -242,48 +250,55 @@ def delete_property(property_id):
 @login_required
 @role_required('Agent immobilier')
 def upload_photos(property_id):
-    prop = Propriete.query.get_or_404(property_id)
+    prop = db.session.get(Propriete, property_id)
+    if prop is None:
+        abort(404)
     if 'photos' not in request.files:
         flash("Aucun fichier envoyé.", "warning")
         return redirect(url_for('properties.view_property', property_id=property_id))
         
     files = request.files.getlist('photos')
     upload_success = False
+    max_size = current_app.config.get('MAX_FILE_SIZE_IMAGE', 10 * 1024 * 1024)
     
     for file in files:
-        if file and allowed_file(file.filename, ALLOWED_IMAGE_EXTENSIONS):
-            # Validation du contenu réel du fichier (Fix #6)
-            if not validate_image_content(file.stream):
-                continue  # Ignorer les fichiers dont le contenu ne correspond pas
-            
-            filename = secure_filename(file.filename)
-            unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{filename}"
-            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'photos', unique_filename)
-            
-            file.save(filepath)
-            
-            # Sauvegarder le chemin relatif en base
-            rel_path = f"uploads/photos/{unique_filename}"
-            
-            # S'il n'y a pas de photos existantes, celle-ci devient la photo principale
-            is_main = PhotoPropriete.query.filter_by(propriete_id=property_id).count() == 0
-            
-            photo_entry = PhotoPropriete(
-                propriete_id=property_id,
-                chemin_fichier=rel_path,
-                photo_principale=is_main
+        if not file or not file.filename:
+            continue
+        try:
+            safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
+                file_storage=file,
+                upload_subdir='uploads/photos',
+                allowed_extensions=ALLOWED_IMAGES,
+                max_size=max_size,
+                category='image',
+                validate_magic=True,
+                user_id=current_user.id
             )
-            db.session.add(photo_entry)
-            upload_success = True
+        except UploadValidationError as e:
+            logger.warning(f"[UPLOAD] Photo rejetée : {e.message}")
+            continue
+        
+        count = db.session.execute(select(sa_func.count(PhotoPropriete.id)).where(PhotoPropriete.propriete_id == property_id)).scalar()
+        is_main = count == 0
+        
+        photo_entry = PhotoPropriete(
+            propriete_id=property_id,
+            chemin_fichier=rel_path,
+            photo_principale=is_main
+        )
+        db.session.add(photo_entry)
+        upload_success = True
             
     if upload_success:
         try:
-            db.session.commit()
             log_activity(current_user.id, f"Ajout photos pour {prop.reference_bien}", "photos_proprietes", prop.id)
+            db.session.commit()
             flash("Les photos ont été téléversées avec succès.", "success")
         except Exception as e:
             db.session.rollback()
-            flash(f"Erreur lors de l'enregistrement en base: {e}", "danger")
+            logger.error(f"[PROPRIETES] Échec enregistrement photos pour propriété id={property_id}: {e}")
+            logger.error(traceback.format_exc())
+            flash("Erreur lors de l'enregistrement des photos en base.", "danger")
     else:
         flash("Aucune photo valide n'a été téléversée (formats autorisés: png, jpg, jpeg, webp, gif).", "danger")
         
@@ -293,7 +308,9 @@ def upload_photos(property_id):
 @login_required
 @role_required('Agent immobilier')
 def delete_photo(photo_id):
-    photo = PhotoPropriete.query.get_or_404(photo_id)
+    photo = db.session.get(PhotoPropriete, photo_id)
+    if photo is None:
+        abort(404)
     property_id = photo.propriete_id
     
     # Supprimer le fichier (avec validation de chemin)
@@ -309,20 +326,21 @@ def delete_photo(photo_id):
     
     try:
         db.session.delete(photo)
-        db.session.commit()
         
         # Si la photo principale a été supprimée, désigner une nouvelle photo principale
         if was_main:
-            next_photo = PhotoPropriete.query.filter_by(propriete_id=property_id).first()
+            next_photo = db.session.execute(select(PhotoPropriete).where(PhotoPropriete.propriete_id == property_id)).scalars().first()
             if next_photo:
                 next_photo.photo_principale = True
-                db.session.commit()
                 
         log_activity(current_user.id, "Suppression d'une photo", "photos_proprietes", photo_id)
+        db.session.commit()
         flash("La photo a été supprimée.", "info")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur de suppression en base: {e}", "danger")
+        logger.error(f"[PROPRIETES] Échec suppression photo id={photo_id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de la suppression de la photo en base.", "danger")
         
     return redirect(url_for('properties.view_property', property_id=property_id))
 
@@ -330,22 +348,27 @@ def delete_photo(photo_id):
 @login_required
 @role_required('Agent immobilier')
 def set_main_photo(photo_id):
-    photo = PhotoPropriete.query.get_or_404(photo_id)
+    photo = db.session.get(PhotoPropriete, photo_id)
+    if photo is None:
+        abort(404)
     property_id = photo.propriete_id
     
     # Retirer le statut principal de toutes les autres photos du bien
-    PhotoPropriete.query.filter_by(propriete_id=property_id).update({PhotoPropriete.photo_principale: False})
+    stmt = update(PhotoPropriete).where(PhotoPropriete.propriete_id == property_id).values(photo_principale=False)
+    db.session.execute(stmt)
     
     # Rendre cette photo principale
     photo.photo_principale = True
     
     try:
-        db.session.commit()
         log_activity(current_user.id, "Modification de la photo principale", "photos_proprietes", photo_id)
+        db.session.commit()
         flash("La photo principale a été modifiée.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur lors de la modification: {e}", "danger")
+        logger.error(f"[PROPRIETES] Échec modification photo principale id={photo_id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de la modification de la photo principale.", "danger")
         
     return redirect(url_for('properties.view_property', property_id=property_id))
 
@@ -354,40 +377,50 @@ def set_main_photo(photo_id):
 @login_required
 @role_required('Agent immobilier')
 def upload_document(property_id):
-    prop = Propriete.query.get_or_404(property_id)
+    prop = db.session.get(Propriete, property_id)
+    if prop is None:
+        abort(404)
     if 'document' not in request.files:
         flash("Aucun fichier envoyé.", "warning")
         return redirect(url_for('properties.view_property', property_id=property_id))
         
     file = request.files['document']
     nom_document = request.form.get('nom_document') or file.filename
+    max_size = current_app.config.get('MAX_FILE_SIZE_DOCUMENT', 15 * 1024 * 1024)
     
-    if file and allowed_file(file.filename, ALLOWED_DOC_EXTENSIONS):
-        filename = secure_filename(file.filename)
-        unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{filename}"
-        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'documents', unique_filename)
-        
-        file.save(filepath)
-        
-        # Sauvegarder en base
-        rel_path = f"uploads/documents/{unique_filename}"
-        doc_entry = DocumentPropriete(
-            propriete_id=property_id,
-            nom_document=nom_document,
-            type_document=filename.rsplit('.', 1)[1].upper(),
-            chemin_fichier=rel_path
+    try:
+        safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
+            file_storage=file,
+            upload_subdir='uploads/documents',
+            allowed_extensions=ALLOWED_DOCUMENTS,
+            max_size=max_size,
+            category='document',
+            validate_magic=True,
+            user_id=current_user.id
         )
-        
-        try:
-            db.session.add(doc_entry)
-            db.session.commit()
-            log_activity(current_user.id, f"Ajout document: {nom_document} pour {prop.reference_bien}", "documents_proprietes", prop.id)
-            flash(f"Le document '{nom_document}' a été téléversé avec succès.", "success")
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Erreur d'enregistrement: {e}", "danger")
-    else:
-        flash("Ficher non autorisé ou invalide.", "danger")
+    except UploadValidationError as e:
+        flash(e.message, "danger")
+        return redirect(url_for('properties.view_property', property_id=property_id))
+    
+    doc_entry = DocumentPropriete(
+        propriete_id=property_id,
+        nom_document=nom_document[:255],
+        type_document=unique_name.rsplit('.', 1)[1].upper() if '.' in unique_name else 'UNKNOWN',
+        chemin_fichier=rel_path
+    )
+    
+    try:
+        db.session.add(doc_entry)
+        log_activity(current_user.id, f"Ajout document: {nom_document} pour {prop.reference_bien}", "documents_proprietes", prop.id)
+        db.session.commit()
+        flash(f"Le document '{nom_document}' a été téléversé avec succès.", "success")
+    except Exception as e:
+        db.session.rollback()
+        if os.path.exists(safe_path):
+            os.remove(safe_path)
+        logger.error(f"[PROPRIETES] Échec enregistrement document pour propriété id={property_id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de l'enregistrement du document en base.", "danger")
         
     return redirect(url_for('properties.view_property', property_id=property_id))
 
@@ -395,7 +428,9 @@ def upload_document(property_id):
 @login_required
 @role_required('Agent immobilier')
 def delete_document(doc_id):
-    doc = DocumentPropriete.query.get_or_404(doc_id)
+    doc = db.session.get(DocumentPropriete, doc_id)
+    if doc is None:
+        abort(404)
     property_id = doc.propriete_id
     
     # Supprimer le fichier physique (avec validation de chemin)
@@ -409,12 +444,14 @@ def delete_document(doc_id):
         
     try:
         db.session.delete(doc)
-        db.session.commit()
         log_activity(current_user.id, f"Suppression document: {doc.nom_document}", "documents_proprietes", doc_id)
+        db.session.commit()
         flash("Le document a été retiré.", "info")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur de suppression: {e}", "danger")
+        logger.error(f"[PROPRIETES] Échec suppression document id={doc_id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de la suppression du document.", "danger")
         
     return redirect(url_for('properties.view_property', property_id=property_id))
 
@@ -430,8 +467,12 @@ def add_visit(property_id):
     
     try:
         date_visite = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-    except ValueError:
+    except (ValueError, TypeError):
         flash("Format de date ou heure invalide.", "danger")
+        return redirect(url_for('properties.view_property', property_id=property_id))
+
+    if date_visite < datetime.now():
+        flash("La date de visite ne peut pas être dans le passé.", "danger")
         return redirect(url_for('properties.view_property', property_id=property_id))
         
     new_visit = Visite(
@@ -445,34 +486,42 @@ def add_visit(property_id):
     
     try:
         db.session.add(new_visit)
-        db.session.commit()
         log_activity(current_user.id, f"Planification visite pour le bien {property_id}", "visites", new_visit.id)
+        db.session.commit()
         flash("La visite a été planifiée avec succès.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur lors de la planification: {e}", "danger")
+        logger.error(f"[PROPRIETES] Échec planification visite pour propriété id={property_id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de la planification de la visite.", "danger")
         
     return redirect(url_for('properties.view_property', property_id=property_id))
 
 @properties.route('/exporter')
 @login_required
 def export_properties():
-    properties_list = Propriete.query.order_by(Propriete.date_ajout.desc()).all()
-    excel_file = export_properties_to_excel(properties_list)
-    log_activity(current_user.id, "Exportation Excel du catalogue immobilier", "proprietes")
-    return send_file(
-        excel_file,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name="Catalogue_Immobilier.xlsx"
-    )
+    try:
+        properties_list = db.session.execute(select(Propriete).order_by(Propriete.date_ajout.desc())).scalars().all()
+        excel_file = export_properties_to_excel(properties_list)
+        log_activity(current_user.id, "Exportation Excel du catalogue immobilier", "proprietes")
+        db.session.commit()
+        return send_file(
+            excel_file,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name="Catalogue_Immobilier.xlsx"
+        )
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"[PROPRIETES] Échec export Excel par user_id={current_user.id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de l'exportation. Veuillez réessayer.", "danger")
+        return redirect(url_for('properties.list_properties'))
 
 @properties.route('/importer', methods=['POST'])
 @login_required
+@role_required('Administrateur', 'Directeur')
 def import_properties():
-    if current_user.role not in ['Administrateur', 'Directeur']:
-        abort(403)
-        
     if 'excel_file' not in request.files:
         flash("Aucun fichier envoyé.", "warning")
         return redirect(url_for('properties.list_properties'))
@@ -481,13 +530,25 @@ def import_properties():
     if not file or file.filename == '':
         flash("Fichier invalide.", "warning")
         return redirect(url_for('properties.list_properties'))
+
+    if check_blocked_extension(file.filename):
+        flash("Type de fichier non autorisé.", "danger")
+        return redirect(url_for('properties.list_properties'))
+
+    if not check_file_size_before_read(file, current_app.config.get('MAX_FILE_SIZE_EXCEL', 10 * 1024 * 1024)):
+        flash("Le fichier Excel dépasse la taille maximale autorisée (10 Mo).", "danger")
+        return redirect(url_for('properties.list_properties'))
+
+    if not validate_excel_content(file.stream):
+        flash("Le fichier ne semble pas être un fichier Excel valide.", "danger")
+        return redirect(url_for('properties.list_properties'))
         
     try:
         properties_data = import_properties_from_excel(file)
         imported_count = 0
         
         for data in properties_data:
-            count = Propriete.query.count()
+            count = db.session.execute(select(sa_func.count(Propriete.id))).scalar()
             reference_bien = f"BIEN-{datetime.now(timezone.utc).year}-{count + 1:04d}"
             
             new_prop = Propriete(
@@ -512,11 +573,13 @@ def import_properties():
             db.session.flush()
             imported_count += 1
             
-        db.session.commit()
         log_activity(current_user.id, f"Importation Excel catalogue : {imported_count} biens immobiliers créés", "proprietes")
+        db.session.commit()
         flash(f"Importation réussie : {imported_count} biens immobiliers ajoutés au catalogue.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Erreur d'importation : {e}", "danger")
+        logger.error(f"[PROPRIETES] Échec import Excel par user_id={current_user.id}: {e}")
+        logger.error(traceback.format_exc())
+        flash("Erreur lors de l'importation. Vérifiez le format du fichier Excel.", "danger")
         
     return redirect(url_for('properties.list_properties'))

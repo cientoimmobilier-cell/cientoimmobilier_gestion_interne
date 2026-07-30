@@ -2,7 +2,7 @@
 
 Bienvenue sur le dépôt du logiciel de Gestion Immobilière de Ciento-Immobilier. Il s'agit d'une application professionnelle développée en Python/Flask conçue pour administrer des biens immobiliers, gérer des propriétaires, des locataires, et suivre la comptabilité.
 
-## 🚀 Fonctionnalités
+## Fonctionnalités
 
 - **Gestion des Biens** : Ajout, modification, suppression, statut (Disponible, Vendu, Loué).
 - **Gestion des Propriétaires** : Profils complets et liaison automatique avec leurs biens.
@@ -14,7 +14,7 @@ Bienvenue sur le dépôt du logiciel de Gestion Immobilière de Ciento-Immobilie
 - **Gestion des Partenaires** : Agences externes, critères de commissions et documents.
 - **Rapports et Statistiques** : Exportation de bilans financiers (Excel) et contrats (PDF).
 
-## 📂 Structure du projet
+## Structure du projet
 
 La structure a été optimisée et nettoyée pour garantir les meilleures pratiques de développement Flask et préparer le déploiement en production :
 
@@ -33,9 +33,7 @@ project/
 │   ├── clear_data.py         # Réinitialisation des données de l'application
 │   └── seed_sample_data.py   # Injection de données de démonstration
 ├── tests/                    # Scripts de tests unitaires (test_app.py)
-├── instance/                 # Base de données locale de développement
-├── docs/                     # Documentation technique
-├── migrations/               # Fichiers de migration de base de données
+├── migrations/               # Fichiers de migration de base de donnees
 ├── config.py                 # Configuration principale
 ├── init_db.py                # Script d'initialisation de la base de données
 ├── render.yaml               # Fichier de configuration Render pour le déploiement
@@ -44,7 +42,7 @@ project/
 └── .env.example              # Modèle de variables d'environnement
 ```
 
-## 🛠️ Installation en local
+## Installation en local
 
 ### 1. Cloner ou télécharger le dépôt
 Placez-vous dans le dossier racine du projet.
@@ -89,19 +87,16 @@ Pour exécuter les vérifications de la base de données et le bon fonctionnemen
 python -m unittest tests.test_app
 ```
 
-## 🌐 Déploiement en Production (Render)
+## Déploiement en Production (Render)
 
-L'application intègre nativement la spécification `render.yaml` assurant un déploiement PaaS rapide, idéal avec une base de données PostgreSQL hébergée sur **Supabase** ou **Render DB**.
+L'application integre la specification `render.yaml` pour un deploiement PaaS rapide avec PostgreSQL (Supabase ou Render DB).
 
-1. Poussez le projet sur un dépôt GitHub ou GitLab.
+1. Poussez le projet sur un depot GitHub ou GitLab.
 2. Créez un compte sur [Render](https://render.com/).
-3. Connectez Render à votre dépôt Git.
-4. L'outil "Blueprint" de Render va détecter le fichier `render.yaml` et déployer automatiquement :
-   - Le serveur web avec **Gunicorn** (configuré avec les workers adéquats).
-   - L'environnement Python en **version 3.12**.
-   - Le script d'installation et d'initialisation automatique `init_db.py`.
+3. Connectez Render à votre depot Git.
+4. Le "Blueprint" de Render détectera `render.yaml` et déploiera automatiquement.
 
-N'oubliez pas d'indiquer la variable environnementale `DATABASE_URL` (format `postgresql://...`) fournie par Supabase ou Render.
+N'oubliez pas de configurer la variable `DATABASE_URL` (format `postgresql://...`).
 
 ---
-**Développé avec soin pour Ciento-Immobilier.**
+Developpe pour Ciento-Immobilier.

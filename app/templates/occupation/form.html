@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action_title }} - Ciento Immobilier{% endblock %}
+{% block header_title %}{{ action_title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card-premium p-4">
+            <form method="POST" action="{{ url_for('occupation.edit_occupation', occ_id=occupation.id) if occupation else url_for('occupation.create_occupation') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="row g-4">
+                    <!-- Locataire -->
+                    <div class="col-12">
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                            <i class="fa-solid fa-user-tie text-warning me-2"></i>Locataire
+                        </h6>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-muted small">Client <span class="text-danger">*</span></label>
+                        <select name="client_id" class="form-select form-control-premium" required>
+                            <option value="">Sélectionnez un client...</option>
+                            {% for c in clients %}
+                            <option value="{{ c.id }}" {{ 'selected' if occupation and occupation.client_id == c.id }}>
+                                {{ c.prenom }} {{ c.nom }} ({{ c.code_client or '' }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Bien -->
+                    <div class="col-12 mt-4">
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                            <i class="fa-solid fa-house-chimney text-warning me-2"></i>Bien immobilier
+                        </h6>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-muted small">Bien <span class="text-danger">*</span></label>
+                        <select name="propriete_id" class="form-select form-control-premium" required>
+                            <option value="">Sélectionnez un bien...</option>
+                            {% for b in biens %}
+                            <option value="{{ b.id }}" {{ 'selected' if occupation and occupation.propriete_id == b.id }}>
+                                {{ b.reference_bien }} - {{ b.titre }} ({{ b.ville }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Agent -->
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-muted small">Agent responsable <span class="text-danger">*</span></label>
+                        <select name="agent_id" class="form-select form-control-premium" required>
+                            <option value="">Sélectionnez un agent...</option>
+                            {% for a in agents_list %}
+                            <option value="{{ a.id }}" {{ 'selected' if occupation and occupation.agent_id == a.id }}>
+                                {{ a.prenom }} {{ a.nom }} ({{ a.role }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Contrat -->
+                    <div class="col-12 mt-4">
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                            <i class="fa-solid fa-file-contract text-warning me-2"></i>Contrat de bail
+                        </h6>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-muted small">Contrat <span class="text-danger">*</span></label>
+                        <select name="contrat_id" class="form-select form-control-premium" required>
+                            <option value="">Sélectionnez un contrat...</option>
+                            {% for ct in contrats %}
+                            <option value="{{ ct.id }}" {{ 'selected' if occupation and occupation.contrat_id == ct.id }}>
+                                {{ ct.numero_contrat }} - {{ ct.date_signature.strftime('%d/%m/%Y') if ct.date_signature else '' }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Dates -->
+                    <div class="col-12 mt-4">
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                            <i class="fa-solid fa-calendar text-warning me-2"></i>Dates
+                        </h6>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold text-muted small">Date d'entrée <span class="text-danger">*</span></label>
+                        <input type="date" name="date_entree" class="form-control form-control-premium" required
+                               value="{{ occupation.date_entree.strftime('%Y-%m-%d') if occupation and occupation.date_entree else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold text-muted small">Date sortie prévue</label>
+                        <input type="date" name="date_sortie_prevue" class="form-control form-control-premium"
+                               value="{{ occupation.date_sortie_prevue.strftime('%Y-%m-%d') if occupation and occupation.date_sortie_prevue else '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold text-muted small">Date sortie réelle</label>
+                        <input type="date" name="date_sortie_reelle" class="form-control form-control-premium"
+                               value="{{ occupation.date_sortie_reelle.strftime('%Y-%m-%d') if occupation and occupation.date_sortie_reelle else '' }}">
+                    </div>
+
+                    <!-- Observations -->
+                    <div class="col-12 mt-4">
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                            <i class="fa-solid fa-note-sticky text-warning me-2"></i>Observations
+                        </h6>
+                    </div>
+                    <div class="col-12">
+                        <textarea name="observations" class="form-control form-control-premium" rows="3" placeholder="Observations éventuelles...">{{ occupation.observations or '' }}</textarea>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <a href="{{ url_for('occupation.list_occupations') }}" class="btn btn-outline-secondary rounded-3">Annuler</a>
+                    <button type="submit" class="btn btn-accent rounded-3 px-4">
+                        <i class="fa-solid fa-save me-2"></i>{{ 'Modifier' if occupation else 'Créer' }} l'occupation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

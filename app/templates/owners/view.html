@@ -69,7 +69,7 @@
                 <a href="{{ url_for('owners.edit_owner', owner_id=owner.id) }}" class="btn btn-premium w-100"><i class="fa-solid fa-user-pen me-2"></i>Modifier la fiche</a>
                 
                 {% if current_user.role in ['Administrateur', 'Directeur'] %}
-                <form action="{{ url_for('owners.delete_owner', owner_id=owner.id) }}" method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce propriétaire ?');">
+                <form action="{{ url_for('owners.delete_owner', owner_id=owner.id) }}" method="POST" data-confirm="Êtes-vous sûr de vouloir supprimer ce propriétaire ?">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-danger w-100"><i class="fa-solid fa-trash-can me-2"></i>Supprimer le propriétaire</button>
                 </form>

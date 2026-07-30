@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from '_search_filters.html' import sort_link, search_form %}
+{% from '_pagination.html' import render_pagination %}
 
 {% block title %}Paramètres - Utilisateurs - Ciento Immobilier{% endblock %}
 {% block header_title %}Gestion des Utilisateurs{% endblock %}
@@ -11,6 +13,8 @@
             <i class="fa-solid fa-plus me-1"></i> Ajouter un collaborateur
         </a>
     </div>
+
+    {{ search_form('settings.list_users', placeholder='Rechercher un utilisateur...') }}
 
     <div class="table-responsive">
         <table class="table table-hover align-middle">
@@ -60,7 +64,7 @@
                             <button type="button" class="btn btn-sm btn-outline-warning rounded-3" title="Définir un nouveau mot de passe" data-bs-toggle="modal" data-bs-target="#resetPasswordModal{{ user.id }}">
                                 <i class="fa-solid fa-key"></i>
                             </button>
-                            <form action="{{ url_for('settings.delete_user', id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Voulez-vous vraiment supprimer cet utilisateur ? Cette action est irréversible.');">
+                            <form action="{{ url_for('settings.delete_user', id=user.id) }}" method="POST" class="d-inline" data-confirm="Voulez-vous vraiment supprimer cet utilisateur ? Cette action est irréversible.">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer">
                                     <i class="fa-solid fa-trash"></i>
@@ -109,5 +113,7 @@
 </div>
 {% endif %}
 {% endfor %}
+
+{{ render_pagination(pagination, 'settings.list_users') }}
 
 {% endblock %}

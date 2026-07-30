@@ -102,7 +102,7 @@
                             </form>
                             
                             <!-- Supprimer -->
-                            <form action="{{ url_for('properties.delete_photo', photo_id=photo.id) }}" method="POST" onsubmit="return confirm('Supprimer cette photo ?');">
+                            <form action="{{ url_for('properties.delete_photo', photo_id=photo.id) }}" method="POST" data-confirm="Supprimer cette photo ?">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm text-danger p-0 border-0" title="Supprimer la photo">
                                     <i class="fa-solid fa-trash-can"></i>
@@ -196,7 +196,7 @@
                         <a href="{{ url_for('static', filename=doc.chemin_fichier) }}" target="_blank" class="text-decoration-none text-dark fw-semibold small">{{ doc.nom_document }}</a>
                         <small class="text-muted d-block" style="font-size: 0.7rem;">Ajouté le {{ doc.date_upload.strftime('%d/%m/%Y') }}</small>
                     </div>
-                    <form action="{{ url_for('properties.delete_document', doc_id=doc.id) }}" method="POST" onsubmit="return confirm('Retirer ce document ?');">
+                    <form action="{{ url_for('properties.delete_document', doc_id=doc.id) }}" method="POST" data-confirm="Retirer ce document ?">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle"><i class="fa-solid fa-trash-can"></i></button>
                     </form>

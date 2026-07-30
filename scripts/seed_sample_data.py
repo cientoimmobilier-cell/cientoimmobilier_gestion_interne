@@ -1,4 +1,5 @@
 import os
+from sqlalchemy import select
 from app import create_app, db
 from app.models import (Utilisateur, Client, DemandeClient, Proprietaire, 
                         Propriete, Caracteristique, Transaction, Commission, 
@@ -12,16 +13,16 @@ def seed_sample_data():
         print("Génération de données de démonstration...")
         
         # Vérifier si l'utilisateur de base existe
-        admin = Utilisateur.query.filter_by(email='admin@ciento.immo').first()
+        admin = db.session.execute(select(Utilisateur).where(Utilisateur.email == 'admin@ciento.immo')).scalars().first()
         if not admin:
             print("Veuillez lancer init_db.py d'abord pour créer la base de données et l'administrateur.")
             return
             
         # 1. Caractéristiques existantes ou nouvelles
-        clim = Caracteristique.query.filter_by(nom='Climatisation').first()
-        piscine = Caracteristique.query.filter_by(nom='Piscine').first()
-        jardin = Caracteristique.query.filter_by(nom='Jardin').first()
-        internet = Caracteristique.query.filter_by(nom='Internet Fibre').first()
+        clim = db.session.execute(select(Caracteristique).where(Caracteristique.nom == 'Climatisation')).scalars().first()
+        piscine = db.session.execute(select(Caracteristique).where(Caracteristique.nom == 'Piscine')).scalars().first()
+        jardin = db.session.execute(select(Caracteristique).where(Caracteristique.nom == 'Jardin')).scalars().first()
+        internet = db.session.execute(select(Caracteristique).where(Caracteristique.nom == 'Internet Fibre')).scalars().first()
         
         # 2. Création de Propriétaires
         p1 = Proprietaire(
