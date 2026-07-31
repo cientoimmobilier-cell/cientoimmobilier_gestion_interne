@@ -587,7 +587,7 @@ class Occupant(db.Model):
     __tablename__ = 'occupants'
     
     id = db.Column(db.Integer, primary_key=True)
-    occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False)
+    occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False, index=True)
     nom = db.Column(db.String(100), nullable=False, index=True)
     prenom = db.Column(db.String(100))
     sexe = db.Column(db.String(10))
@@ -605,7 +605,7 @@ class RapportVisite(db.Model):
     __tablename__ = 'rapports_visites'
     
     id = db.Column(db.Integer, primary_key=True)
-    occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False)
+    occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False, index=True)
     agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
     date_visite = db.Column(db.DateTime, nullable=False, index=True)
     type_visite = db.Column(db.String(30), nullable=False)
@@ -625,7 +625,7 @@ class DocumentOccupation(db.Model):
     __tablename__ = 'documents_occupations'
     
     id = db.Column(db.Integer, primary_key=True)
-    occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False)
+    occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False, index=True)
     nom_document = db.Column(db.String(255), nullable=False)
     type_document = db.Column(db.String(100))
     chemin_fichier = db.Column(db.Text, nullable=False)

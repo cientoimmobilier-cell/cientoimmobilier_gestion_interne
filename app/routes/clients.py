@@ -47,7 +47,7 @@ def list_clients():
 
     pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
 
-    return render_template('clients/list.html', pagination=pagination, search=search, sort=sort, order=order)
+    return render_template('clients/list.html', clients=pagination.items, pagination=pagination, search=search, sort=sort, order=order)
 
 @clients.route('/ajouter', methods=['GET', 'POST'])
 @login_required

@@ -68,6 +68,7 @@ def list_properties():
     return render_template(
         'properties/list.html', 
         pagination=pagination,
+        properties=pagination.items,
         property_types=property_types,
         search=search,
         type_bien=type_bien,

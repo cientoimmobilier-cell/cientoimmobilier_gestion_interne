@@ -3,7 +3,7 @@ import traceback
 from flask import Blueprint, render_template, request, flash, redirect, url_for, abort
 from flask_login import login_required, current_user
 from app.models import Utilisateur, Transaction, Visite, Commission, BienAirbnb, MouvementFinancier
-from app.utils.helpers import log_activity, role_required
+from app.utils.helpers import log_activity, role_required, sanitize_search
 from app import db
 from sqlalchemy import select, func as sa_func
 
@@ -24,7 +24,8 @@ def list_users():
     stmt = select(Utilisateur)
 
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(
             db.or_(Utilisateur.nom.ilike(search_term), Utilisateur.prenom.ilike(search_term), Utilisateur.email.ilike(search_term))
         )
@@ -36,7 +37,7 @@ def list_users():
         stmt = stmt.order_by(Utilisateur.nom.asc())
 
     pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
-    return render_template('settings/users_list.html', pagination=pagination, sort=sort, order=order)
+    return render_template('settings/users_list.html', users=pagination.items, pagination=pagination, sort=sort, order=order)
 
 @settings_bp.route('/users/add', methods=['GET', 'POST'])
 @login_required

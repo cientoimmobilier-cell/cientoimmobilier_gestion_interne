@@ -8,7 +8,7 @@
             sur {{ pagination.total }}
         </span>
         <select class="form-select form-select-sm rounded-3" style="width:auto;font-size:0.85rem;"
-                onchange="window.location.href='{{ url_for(endpoint, **kwargs) }}?per_page='+this.value+'&page=1&{{ request.query_string|replace(b'per_page='+(request.args.get('per_page','20')|string).encode(), b'')|replace(b'&page='+(request.args.get('page','1')|string).encode(), b'')|safe }}'">
+                onchange="var u=new URLSearchParams(window.location.search);u.set('per_page',this.value);u.set('page','1');window.location.href='{{ url_for(endpoint, **kwargs) }}?'+u.toString()">
             <option value="10" {{ 'selected' if per_page == 10 }}>10</option>
             <option value="20" {{ 'selected' if per_page == 20 }}>20</option>
             <option value="50" {{ 'selected' if per_page == 50 }}>50</option>

@@ -29,7 +29,8 @@ def list_partenaires():
 
     stmt = select(Partenaire)
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(
             db.or_(Partenaire.nom.ilike(search_term), Partenaire.email.ilike(search_term), Partenaire.telephone.ilike(search_term))
         )
@@ -41,7 +42,7 @@ def list_partenaires():
         stmt = stmt.order_by(Partenaire.nom.asc())
 
     pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
-    return render_template('partenaires/list.html', pagination=pagination, sort=sort, order=order)
+    return render_template('partenaires/list.html', partenaires=pagination.items, pagination=pagination, sort=sort, order=order)
 
 @partenaires.route('/ajouter', methods=['GET', 'POST'])
 @login_required

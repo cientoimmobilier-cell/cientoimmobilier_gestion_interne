@@ -1,13 +1,13 @@
 import logging
 import traceback
-from flask import Blueprint, render_template, request, flash, redirect, url_for, abort
+from flask import Blueprint, render_template, request, flash, redirect, url_for
 from flask_login import login_required, current_user
 from app import db
 from app.models import CompteBancaire, Caisse, MouvementFinancier, Facture, Recu, Budget, Client
 from datetime import datetime, timezone, date
 from sqlalchemy.orm import joinedload
 from sqlalchemy import select, func as sa_func
-from app.utils.helpers import log_activity, role_required, sanitize_input
+from app.utils.helpers import log_activity, role_required, sanitize_input, sanitize_search
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,8 @@ def recettes():
     ).where(MouvementFinancier.type_mouvement == 'Recette')
     
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(
             db.or_(
                 MouvementFinancier.description.ilike(search_term),
@@ -117,7 +118,8 @@ def depenses():
     ).where(MouvementFinancier.type_mouvement == 'Dépense')
     
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(
             db.or_(
                 MouvementFinancier.description.ilike(search_term),
@@ -152,7 +154,8 @@ def caisse():
     stmt = select(MouvementFinancier).options(joinedload(MouvementFinancier.caisse)).where(MouvementFinancier.caisse_id.isnot(None))
     
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(
             db.or_(
                 MouvementFinancier.description.ilike(search_term),
@@ -184,7 +187,8 @@ def banque():
     stmt = select(MouvementFinancier).options(joinedload(MouvementFinancier.compte_bancaire)).where(MouvementFinancier.compte_bancaire_id.isnot(None))
     
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(
             db.or_(
                 MouvementFinancier.description.ilike(search_term),
@@ -215,7 +219,8 @@ def factures():
     stmt = select(Facture).options(joinedload(Facture.client_facture))
     
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(Facture.numero_facture.ilike(search_term))
     
     sort_column = getattr(Facture, sort, Facture.date_emission)
@@ -242,7 +247,8 @@ def recus():
     stmt = select(Recu).options(joinedload(Recu.client_recu))
     
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(Recu.numero_recu.ilike(search_term))
     
     sort_column = getattr(Recu, sort, Recu.date_emission)
@@ -269,7 +275,8 @@ def budgets():
     stmt = select(Budget)
     
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(Budget.categorie.ilike(search_term))
     
     sort_column = getattr(Budget, sort, Budget.annee)
@@ -298,7 +305,7 @@ def add_mouvement():
         if montant <= 0:
             raise ValueError("Le montant doit être positif.")
     except (ValueError, TypeError) as e:
-        flash(f"Montant invalide : {e}", "danger")
+        flash("Montant invalide. Veuillez vérifier la valeur saisie.", "danger")
         return redirect(request.referrer or url_for('finance.index'))
     
     devise = request.form.get('devise', 'EUR').strip()

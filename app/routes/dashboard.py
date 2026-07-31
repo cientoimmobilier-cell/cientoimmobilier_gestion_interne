@@ -116,9 +116,15 @@ def activities():
             stmt = stmt.order_by(JournalActivite.date_action.desc())
 
         pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
-        return render_template('dashboard/activities.html', pagination=pagination, sort=sort, order=order)
+        return render_template('dashboard/activities.html', logs=pagination.items, pagination=pagination, sort=sort, order=order)
     except Exception as e:
         logger.error(f"[DASHBOARD] Erreur chargement activités: {e}")
         logger.error(traceback.format_exc())
         flash("Erreur lors du chargement du journal d'activités.", "danger")
-        return render_template('dashboard/activities.html', pagination=None)
+        return render_template('dashboard/activities.html', pagination=None, logs=[])
+
+
+@dashboard.route('/a-propos')
+@login_required
+def about():
+    return render_template('dashboard/about.html')

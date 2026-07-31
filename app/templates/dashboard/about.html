@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}À propos - Ciento Immobilier{% endblock %}
+{% block header_title %}À propos{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-6 col-lg-8">
+        <div class="card-premium text-center">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo CIENTO IMMOBILIER" class="img-fluid mx-auto d-block mb-4" style="max-width: 180px; max-height: 180px; object-fit: contain;">
+            <h4 class="fw-bold text-dark mb-0">CIENTO IMMOBILIER</h4>
+            <span class="text-muted text-uppercase fw-semibold" style="font-size: 0.8rem; letter-spacing: 3px;">Enterprise Desktop</span>
+            <hr class="my-4">
+            <div class="text-start small">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Version</span>
+                    <span class="fw-semibold text-dark">1.0.0</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Éditeur</span>
+                    <span class="fw-semibold text-dark">Ciento Immobilier</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Technologie</span>
+                    <span class="fw-semibold text-dark">Flask · PostgreSQL · PyWebView</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Type de lancement</span>
+                    <span class="fw-semibold text-dark">Application de bureau Windows</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Serveur backend</span>
+                    <span class="fw-semibold text-dark">Local (arrière-plan, invisible)</span>
+                </div>
+            </div>
+            <hr class="my-4">
+            <p class="text-muted mb-0" style="font-size: 0.8rem;">© 2026 Ciento Immobilier. Tous droits réservés.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

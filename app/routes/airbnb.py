@@ -280,6 +280,7 @@ def add_reservation(bien_id):
 
 @airbnb.route('/reservation/supprimer/<int:reservation_id>', methods=['POST'])
 @login_required
+@role_required('Administrateur', 'Directeur')
 def delete_reservation(reservation_id):
     reservation = db.session.get(ReservationAirbnb, reservation_id)
     if reservation is None:

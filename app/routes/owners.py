@@ -44,7 +44,7 @@ def list_owners():
 
     pagination = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
 
-    return render_template('owners/list.html', pagination=pagination, search=search, sort=sort, order=order)
+    return render_template('owners/list.html', owners=pagination.items, pagination=pagination, search=search, sort=sort, order=order)
 
 @owners.route('/ajouter', methods=['GET', 'POST'])
 @login_required

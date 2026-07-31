@@ -23,7 +23,8 @@ def list_agents():
     stmt = select(Utilisateur).where(Utilisateur.role == 'Agent immobilier')
 
     if search:
-        search_term = f'%{search}%'
+        safe_search = sanitize_search(search)
+        search_term = f'%{safe_search}%'
         stmt = stmt.where(
             db.or_(Utilisateur.nom.ilike(search_term), Utilisateur.prenom.ilike(search_term), Utilisateur.email.ilike(search_term))
         )
@@ -45,7 +46,7 @@ def list_agents():
     ).distinct()).scalars().all()
     zones = [z for z in zones if z]
 
-    return render_template('agents/list.html', pagination=pagination, zones=zones, sort=sort, order=order)
+    return render_template('agents/list.html', agents=pagination.items, pagination=pagination, zones=zones, sort=sort, order=order)
 
 @agents.route('/details/<int:agent_id>')
 @login_required

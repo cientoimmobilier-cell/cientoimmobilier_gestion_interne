@@ -107,7 +107,7 @@ def create_app(config_class=None):
     @app.context_processor
     def inject_csp_nonce():
         from app.utils.security import generate_nonce
-        return dict(csp_nonce=generate_nonce())
+        return dict(csp_nonce=generate_nonce)
 
     # En-têtes HTTP de sécurité (CSP, HSTS, etc.)
     @app.after_request

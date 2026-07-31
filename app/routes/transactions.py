@@ -8,7 +8,7 @@ from app.utils.upload_security import (
     validate_and_save_upload, UploadValidationError, ALLOWED_PDFS
 )
 from app import db
-from sqlalchemy import select, update, func as sa_func
+from sqlalchemy import select, func as sa_func
 from sqlalchemy.orm import joinedload
 from app.services.pdf_service import generate_transaction_sheet_pdf, generate_payment_receipt_pdf
 from app.services.excel_service import export_transactions_to_excel
