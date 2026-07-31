@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% from '_pagination.html' import render_pagination %}
+{% block title %}Mes sauvegardes - Ciento Immobilier{% endblock %}
+{% block header_title %}Mes sauvegardes cloud{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+    <div class="col-lg-9">
+        <div class="card-premium">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-cloud text-warning me-2"></i>Sauvegardes téléversées</h5>
+                <a href="{{ url_for('cloud_backup.index') }}" class="btn btn-accent rounded-3 btn-sm">
+                    <i class="fa-solid fa-cloud-arrow-up me-1"></i> Sauvegarder maintenant
+                </a>
+            </div>
+
+            <form method="GET" action="{{ url_for('cloud_backup.backups') }}" class="row g-2 mb-3">
+                <div class="col-md-5">
+                    <select class="form-select form-select-sm" name="type">
+                        <option value="">Tous les types</option>
+                        {% for t in types %}
+                        <option value="{{ t }}" {{ 'selected' if backup_type == t }}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <select class="form-select form-select-sm" name="statut">
+                        <option value="">Tous les statuts</option>
+                        <option value="success" {{ 'selected' if status_filter == 'success' }}>Réussie</option>
+                        <option value="failed" {{ 'selected' if status_filter == 'failed' }}>Échec</option>
+                        <option value="running" {{ 'selected' if status_filter == 'running' }}>En cours</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-outline-primary btn-sm rounded-3 flex-fill"><i class="fa-solid fa-filter me-1"></i>Filtrer</button>
+                    <a href="{{ url_for('cloud_backup.backups') }}" class="btn btn-outline-secondary btn-sm rounded-3"><i class="fa-solid fa-rotate"></i></a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Type / Dossier</th>
+                            <th>Statut</th>
+                            <th>Taille</th>
+                            <th>Fichiers</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in records %}
+                        <tr>
+                            <td class="small">
+                                <div class="fw-bold">{{ rec.started_at.strftime('%d/%m/%Y %H:%M') }}</div>
+                                <small class="text-muted">par {{ rec.triggered_by or '--' }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-info text-dark">{{ rec.backup_type }}</span>
+                                <small class="text-muted d-block">{{ rec.drive_folder or '--' }}</small>
+                            </td>
+                            <td>
+                                {% if rec.status == 'success' %}
+                                <span class="badge bg-success" title="{{ rec.message }}">Réussie</span>
+                                {% elif rec.status == 'failed' %}
+                                <span class="badge bg-danger" title="{{ rec.message }}">Échec</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">En cours</span>
+                                {% endif %}
+                                {% if rec.file_name %}<small class="d-block text-muted text-truncate" style="max-width: 180px;" title="{{ rec.file_name }}">{{ rec.file_name }}</small>{% endif %}
+                            </td>
+                            <td class="small">{{ (rec.size_bytes / 1024 / 1024)|round(2) if rec.size_bytes else '--' }} Mo</td>
+                            <td class="small">{{ rec.file_count or '--' }}</td>
+                            <td class="text-end">
+                                <div class="d-flex justify-content-end gap-1">
+                                    {% if rec.status == 'success' and rec.drive_file_id %}
+                                    <a href="{{ url_for('cloud_backup.download', record_id=rec.id) }}" class="btn btn-sm btn-outline-primary rounded-3" title="Télécharger l'archive chiffrée">
+                                        <i class="fa-solid fa-download"></i>
+                                    </a>
+                                    <a href="{{ url_for('cloud_backup.restore', record_id=rec.id) }}" class="btn btn-sm btn-outline-success rounded-3" title="Restaurer">
+                                        <i class="fa-solid fa-rotate-left"></i>
+                                    </a>
+                                    {% endif %}
+                                    <form action="{{ url_for('cloud_backup.delete', record_id=rec.id) }}" method="POST" class="d-inline" data-confirm="Supprimer cette sauvegarde de Google Drive ?">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                <i class="fa-solid fa-folder-open fa-2x d-block mb-2"></i>Aucune sauvegarde trouvée.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {{ render_pagination(pagination, 'cloud_backup.backups') }}
+        </div>
+    </div>
+
+    <div class="col-lg-3">
+        <div class="card-premium mb-3">
+            <h6 class="fw-bold text-dark mb-2"><i class="fa-brands fa-google-drive text-warning me-1"></i>Espace Drive</h6>
+            {% if quota %}
+            {% set pct = (quota.usage / quota.limit * 100) if quota.limit else 0 %}
+            <div class="progress rounded-3 mb-1" style="height: 8px;">
+                <div class="progress-bar bg-warning" style="width: {{ pct|round(1) if pct <= 100 else 100 }}%"></div>
+            </div>
+            <small class="text-muted">{{ (quota.usage / 1024 / 1024 / 1024)|round(2) }} / {{ (quota.limit / 1024 / 1024 / 1024)|round(2) }} Go</small>
+            <div class="small mt-2 text-muted text-truncate" title="{{ account_email }}"><i class="fa-solid fa-user me-1"></i>{{ account_email or 'Compte Google' }}</div>
+            {% else %}
+            <p class="text-muted small mb-0">Indisponible (hors ligne ou déconnecté).</p>
+            {% endif %}
+        </div>
+        <div class="card-premium">
+            <h6 class="fw-bold text-dark mb-2"><i class="fa-solid fa-shield-halved text-success me-1"></i>Archives chiffrées</h6>
+            <p class="small text-muted mb-0">Chaque archive téléversée est chiffrée en AES-256-GCM avant envoi. Le téléchargement renvoie le fichier chiffré (<code>.ciento</code>) — la phrase de passe est requise pour le déchiffrer.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

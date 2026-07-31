@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from '_pagination.html' import render_pagination %}
+{% block title %}Historique des sauvegardes - Ciento Immobilier{% endblock %}
+{% block header_title %}Historique des sauvegardes cloud{% endblock %}
+
+{% block content %}
+<div class="card-premium">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list-ul text-warning me-2"></i>Historique complet</h5>
+        <a href="{{ url_for('cloud_backup.backups') }}" class="btn btn-outline-secondary btn-sm rounded-3">
+            <i class="fa-solid fa-arrow-left me-1"></i> Mes sauvegardes
+        </a>
+    </div>
+
+    <form method="GET" action="{{ url_for('cloud_backup.history') }}" class="row g-2 mb-3">
+        <div class="col-md-5">
+            <select class="form-select form-select-sm" name="type">
+                <option value="">Tous les types</option>
+                {% for t in types %}
+                <option value="{{ t }}" {{ 'selected' if backup_type == t }}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <select class="form-select form-select-sm" name="statut">
+                <option value="">Tous les statuts</option>
+                <option value="success" {{ 'selected' if status_filter == 'success' }}>Réussie</option>
+                <option value="failed" {{ 'selected' if status_filter == 'failed' }}>Échec</option>
+                <option value="running" {{ 'selected' if status_filter == 'running' }}>En cours</option>
+            </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-outline-primary btn-sm rounded-3 flex-fill"><i class="fa-solid fa-filter me-1"></i>Filtrer</button>
+            <a href="{{ url_for('cloud_backup.history') }}" class="btn btn-outline-secondary btn-sm rounded-3"><i class="fa-solid fa-rotate"></i></a>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Début</th>
+                    <th>Fin</th>
+                    <th>Durée</th>
+                    <th>Type</th>
+                    <th>Déclenchée par</th>
+                    <th>Statut</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rec in records %}
+                <tr>
+                    <td class="small">{{ rec.started_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="small">{{ rec.finished_at.strftime('%d/%m/%Y %H:%M') if rec.finished_at else '--' }}</td>
+                    <td class="small">{{ (rec.duration_seconds / 60)|round(1) if rec.duration_seconds is not none else '--' }} min</td>
+                    <td><span class="badge bg-info text-dark">{{ rec.backup_type }}</span></td>
+                    <td class="small">{{ rec.triggered_by or '--' }}</td>
+                    <td>
+                        {% if rec.status == 'success' %}<span class="badge bg-success">Réussie</span>
+                        {% elif rec.status == 'failed' %}<span class="badge bg-danger">Échec</span>
+                        {% else %}<span class="badge bg-warning text-dark">En cours</span>{% endif %}
+                    </td>
+                    <td class="small text-truncate text-muted" style="max-width: 260px;" title="{{ rec.message }}">{{ rec.message or '--' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">Aucun historique trouvé.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {{ render_pagination(pagination, 'cloud_backup.history') }}
+</div>
+{% endblock %}

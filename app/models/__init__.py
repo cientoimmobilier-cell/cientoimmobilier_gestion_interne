@@ -631,3 +631,85 @@ class DocumentOccupation(db.Model):
     chemin_fichier = db.Column(db.Text, nullable=False)
     date_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
+
+class CloudBackupSetting(db.Model):
+    """Configuration singleton du module Sauvegarde Cloud Google Drive.
+
+    Les secrets (client_id/secret Google, jeton OAuth, phrase de passe de
+    chiffrement) sont stockes chiffres, jamais en clair.
+    """
+    __tablename__ = 'cloud_backup_settings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    google_client_id_wrapped = db.Column(db.Text)
+    google_client_secret_wrapped = db.Column(db.Text)
+    google_account_email = db.Column(db.String(255))
+    token_encrypted = db.Column(db.Text)
+    drive_root_id = db.Column(db.String(100))
+    drive_daily_id = db.Column(db.String(100))
+    drive_weekly_id = db.Column(db.String(100))
+    drive_monthly_id = db.Column(db.String(100))
+    drive_archive_id = db.Column(db.String(100))
+    encryption_passphrase_wrapped = db.Column(db.Text)
+    passphrase_set_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
+
+    @staticmethod
+    def get():
+        setting = db.session.get(CloudBackupSetting, 1)
+        if setting is None:
+            setting = CloudBackupSetting(id=1)
+            db.session.add(setting)
+            db.session.commit()
+        return setting
+
+
+class CloudBackupSchedule(db.Model):
+    """Planificateur des sauvegardes automatiques (ligne unique)."""
+    __tablename__ = 'cloud_backup_schedules'
+
+    id = db.Column(db.Integer, primary_key=True)
+    enabled = db.Column(db.Boolean, default=False, index=True)
+    frequency = db.Column(db.String(20), default='daily')  # hourly, daily, weekly, monthly
+    hour = db.Column(db.Integer, default=2)
+    minute = db.Column(db.Integer, default=0)
+    day_of_week = db.Column(db.Integer, default=1)  # 0=lundi ... 6=dimanche
+    day_of_month = db.Column(db.Integer, default=1)
+    retention = db.Column(db.Integer, default=7)
+    include_data = db.Column(db.Text, default='all')
+    last_run_at = db.Column(db.DateTime)
+    next_run_at = db.Column(db.DateTime, index=True)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc),
+                           onupdate=lambda: datetime.now(timezone.utc))
+
+    @staticmethod
+    def get():
+        schedule = db.session.get(CloudBackupSchedule, 1)
+        if schedule is None:
+            schedule = CloudBackupSchedule(id=1)
+            db.session.add(schedule)
+            db.session.commit()
+        return schedule
+
+
+class CloudBackupRecord(db.Model):
+    """Historique des sauvegardes cloud."""
+    __tablename__ = 'cloud_backups'
+
+    id = db.Column(db.Integer, primary_key=True)
+    backup_type = db.Column(db.String(20), nullable=False, index=True)  # Daily, Weekly, Monthly, Archive, Manual
+    status = db.Column(db.String(20), nullable=False, default='running', index=True)  # running, success, failed
+    started_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    finished_at = db.Column(db.DateTime)
+    duration_seconds = db.Column(db.Float)
+    file_count = db.Column(db.Integer, default=0)
+    size_bytes = db.Column(db.BigInteger, default=0)
+    file_name = db.Column(db.String(255))
+    drive_file_id = db.Column(db.String(100))
+    drive_folder = db.Column(db.String(30))
+    message = db.Column(db.Text)
+    triggered_by = db.Column(db.String(150))
+    account_email = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+

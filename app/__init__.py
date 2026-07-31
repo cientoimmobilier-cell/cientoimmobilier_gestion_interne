@@ -58,6 +58,7 @@ def create_app(config_class=None):
     from app.routes.finance import finance as finance_blueprint
     from app.routes.partenaires import partenaires as partenaires_blueprint
     from app.routes.occupation import occupation as occupation_blueprint
+    from app.routes.cloud_backup import cloud_backup_bp
     
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(dashboard_blueprint, url_prefix='/')
@@ -71,6 +72,16 @@ def create_app(config_class=None):
     app.register_blueprint(finance_blueprint, url_prefix='/finance')
     app.register_blueprint(partenaires_blueprint, url_prefix='/partenaires')
     app.register_blueprint(occupation_blueprint, url_prefix='/occupations')
+    app.register_blueprint(cloud_backup_bp)
+
+    # Planificateur des sauvegardes cloud (une seule instance par processus)
+    if not app.config.get('TESTING'):
+        from app.services.scheduler_service import BackupScheduler
+        scheduler = app.extensions.get('backup_scheduler')
+        if scheduler is None:
+            scheduler = BackupScheduler()
+            app.extensions['backup_scheduler'] = scheduler
+        scheduler.start(app)
     
     # Contexte global pour les templates (rôles et utilitaires)
     @app.context_processor

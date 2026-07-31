@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block title %}Sauvegarde Cloud - Ciento Immobilier{% endblock %}
+{% block header_title %}Sauvegarde Cloud Google Drive{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h5 class="fw-bold text-dark mb-0"><i class="fa-brands fa-google-drive text-warning me-2"></i>Tableau de bord des sauvegardes</h5>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('cloud_backup.backups') }}" class="btn btn-outline-secondary rounded-3">
+            <i class="fa-solid fa-clock-rotate-left me-1"></i> Mes sauvegardes
+        </a>
+        <a href="{{ url_for('cloud_backup.history') }}" class="btn btn-outline-secondary rounded-3">
+            <i class="fa-solid fa-list-ul me-1"></i> Historique
+        </a>
+        {% if service.is_connected() %}
+        <button type="button" class="btn btn-accent rounded-3" data-bs-toggle="modal" data-bs-target="#backupModal">
+            <i class="fa-solid fa-cloud-arrow-up me-1"></i> Sauvegarder maintenant
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Connexion Google -->
+    <div class="col-lg-6">
+        <div class="card-premium h-100">
+            <div class="d-flex align-items-center mb-3">
+                <div class="bg-light rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 44px; height: 44px;">
+                    <i class="fa-brands fa-google text-danger fa-xl"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-0">Connexion Google Drive</h6>
+                    <small class="text-muted">OAuth 2.0 — aucune saisie de mot de passe Google</small>
+                </div>
+                {% if service.is_connected() %}
+                <span class="ms-auto badge bg-success">Connecté</span>
+                {% else %}
+                <span class="ms-auto badge bg-secondary">Non connecté</span>
+                {% endif %}
+            </div>
+
+            {% if service.is_connected() %}
+            <div class="mb-3">
+                <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-muted"><i class="fa-solid fa-user me-1"></i>{{ setting.google_account_email or 'Compte Google' }}</span>
+                </div>
+                {% if quota %}
+                {% set pct = (quota.usage / quota.limit * 100) if quota.limit else 0 %}
+                <div class="progress rounded-3" style="height: 8px;">
+                    <div class="progress-bar bg-warning" style="width: {{ pct|round(1) if pct <= 100 else 100 }}%"></div>
+                </div>
+                <small class="text-muted mt-1 d-block">
+                    {{ (quota.usage / 1024 / 1024 / 1024)|round(2) }} Go / {{ (quota.limit / 1024 / 1024 / 1024)|round(2) }} Go utilisés
+                </small>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('cloud_backup.backups') }}" class="btn btn-sm btn-outline-primary rounded-3"><i class="fa-solid fa-folder-open me-1"></i>Voir les sauvegardes</a>
+                <form action="{{ url_for('cloud_backup.disconnect') }}" method="POST" class="d-inline" data-confirm="Déconnecter ce compte Google ?">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-3"><i class="fa-solid fa-right-from-bracket me-1"></i>Déconnecter</button>
+                </form>
+            </div>
+            {% else %}
+            {% if service.is_configured() %}
+            <p class="text-muted small mb-3">Connectez votre compte Google pour activer les sauvegardes chiffrées AES-256.</p>
+            <a href="{{ url_for('cloud_backup.connect') }}" class="btn btn-primary rounded-3">
+                <i class="fa-brands fa-google me-1"></i> Se connecter avec Google
+            </a>
+            {% else %}
+            <form action="{{ url_for('cloud_backup.save_credentials') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="mb-2">
+                    <label class="form-label fw-semibold small">Client ID (console Google Cloud)</label>
+                    <input type="text" class="form-control form-control-sm" name="google_client_id" required placeholder="xxxxxxxx.apps.googleusercontent.com">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold small">Client Secret</label>
+                    <input type="text" class="form-control form-control-sm" name="google_client_secret" required placeholder="GOCSPX-...">
+                </div>
+                <button type="submit" class="btn btn-primary rounded-3"><i class="fa-solid fa-floppy-disk me-1"></i> Enregistrer les identifiants (chiffrés)</button>
+            </form>
+            <div class="alert alert-info small mt-3 mb-0 rounded-3">
+                <i class="fa-solid fa-circle-info me-1"></i>
+                URI de redirection à déclarer dans Google Cloud :
+                <code>{{ url_for('cloud_backup.callback', _external=True) }}</code>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Chiffrement AES-256 -->
+    <div class="col-lg-6">
+        <div class="card-premium h-100">
+            <div class="d-flex align-items-center mb-3">
+                <div class="bg-light rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 44px; height: 44px;">
+                    <i class="fa-solid fa-shield-halved text-success fa-xl"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-0">Chiffrement AES-256-GCM</h6>
+                    <small class="text-muted">Les archives sont chiffrées avant tout envoi</small>
+                </div>
+                {% if setting.encryption_passphrase_wrapped %}
+                <span class="ms-auto badge bg-success">Clé définie</span>
+                {% else %}
+                <span class="ms-auto badge bg-danger">Clé manquante</span>
+                {% endif %}
+            </div>
+
+            {% if setting.encryption_passphrase_wrapped %}
+            <div class="alert alert-success small rounded-3 py-2 mb-3">
+                <i class="fa-solid fa-check-circle me-1"></i>
+                Phrase de passe définie
+                {% if setting.passphrase_set_at %}le {{ setting.passphrase_set_at.strftime('%d/%m/%Y') }}{% endif %}.
+                Conservez-la précieusement : elle est nécessaire pour restaurer les archives.
+            </div>
+            {% endif %}
+
+            <form action="{{ url_for('cloud_backup.save_passphrase') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small">Nouvelle phrase de passe (min. {{ passphrase_min }} caractères)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="password" class="form-control" id="passphrase" name="passphrase" required minlength="{{ passphrase_min }}">
+                            <button type="button" class="btn btn-outline-secondary" id="genPass" title="Générer une phrase forte"><i class="fa-solid fa-dice"></i></button>
+                            <button type="button" class="btn btn-outline-secondary" id="togglePass" title="Afficher/masquer"><i class="fa-solid fa-eye"></i></button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small">Confirmation</label>
+                        <input type="password" class="form-control form-control-sm" name="confirmation" required minlength="{{ passphrase_min }}">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-outline-success btn-sm rounded-3 mt-3">
+                    <i class="fa-solid fa-key me-1"></i> {{ 'Mettre à jour la phrase de passe' if setting.encryption_passphrase_wrapped else 'Définir la phrase de passe' }}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-0">
+    <!-- Planification -->
+    <div class="col-lg-6">
+        <div class="card-premium h-100">
+            <div class="d-flex align-items-center mb-3">
+                <div class="bg-light rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 44px; height: 44px;">
+                    <i class="fa-solid fa-calendar-days text-primary fa-xl"></i>
+                </div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-0">Planification automatique</h6>
+                    <small class="text-muted">Sauvegardes planifiées + rétention</small>
+                </div>
+                <span class="ms-auto badge {{ 'bg-success' if schedule.enabled else 'bg-secondary' }}">
+                    {{ 'Activé' if schedule.enabled else 'Désactivé' }}
+                </span>
+            </div>
+
+            <form action="{{ url_for('cloud_backup.save_schedule') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" name="enabled" id="schedEnabled" {{ 'checked' if schedule.enabled }}>
+                    <label class="form-check-label small fw-semibold" for="schedEnabled">Activer les sauvegardes automatiques</label>
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small">Fréquence</label>
+                        <select class="form-select form-select-sm" name="frequency" id="frequency">
+                            <option value="hourly" {{ 'selected' if schedule.frequency == 'hourly' }}>Toutes les heures</option>
+                            <option value="daily" {{ 'selected' if schedule.frequency == 'daily' }}>Chaque jour</option>
+                            <option value="weekly" {{ 'selected' if schedule.frequency == 'weekly' }}>Chaque semaine</option>
+                            <option value="monthly" {{ 'selected' if schedule.frequency == 'monthly' }}>Chaque mois</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold small">Heure (UTC)</label>
+                        <input type="number" class="form-control form-control-sm" name="hour" min="0" max="23" value="{{ schedule.hour }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold small">Minute</label>
+                        <input type="number" class="form-control form-control-sm" name="minute" min="0" max="59" value="{{ schedule.minute }}">
+                    </div>
+                    <div class="col-md-6" id="dayOfWeekField" style="{{ 'display:none;' if schedule.frequency != 'weekly' }}">
+                        <label class="form-label fw-semibold small">Jour de la semaine</label>
+                        <select class="form-select form-select-sm" name="day_of_week">
+                            {% for i, label in [(0,'Lundi'),(1,'Mardi'),(2,'Mercredi'),(3,'Jeudi'),(4,'Vendredi'),(5,'Samedi'),(6,'Dimanche')] %}
+                            <option value="{{ i }}" {{ 'selected' if schedule.day_of_week == i }}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6" id="dayOfMonthField" style="{{ 'display:none;' if schedule.frequency != 'monthly' }}">
+                        <label class="form-label fw-semibold small">Jour du mois</label>
+                        <input type="number" class="form-control form-control-sm" name="day_of_month" min="1" max="28" value="{{ schedule.day_of_month }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small">Rétention (nombre de sauvegardes conservées)</label>
+                        <input type="number" class="form-control form-control-sm" name="retention" min="1" max="365" value="{{ schedule.retention }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small">Données incluses</label>
+                        <select class="form-select form-select-sm" name="include_data" multiple size="4">
+                            {% for key, group in groups.items() %}
+                            <option value="{{ key }}" {{ 'selected' if key in schedule.include_data.split(',') or schedule.include_data == 'all' }}>{{ group.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Tout si aucune sélection / Aucun filtre actif</small>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-outline-primary btn-sm rounded-3 mt-3">
+                    <i class="fa-solid fa-save me-1"></i> Enregistrer la planification
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dernières sauvegardes -->
+    <div class="col-lg-6">
+        <div class="card-premium h-100">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                    <div class="bg-light rounded-3 d-flex align-items-center justify-content-center me-3" style="width: 44px; height: 44px;">
+                        <i class="fa-solid fa-clock-rotate-left text-secondary fa-xl"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0">Dernières sauvegardes</h6>
+                        <small class="text-muted">5 dernières exécutions</small>
+                    </div>
+                </div>
+                <a href="{{ url_for('cloud_backup.history') }}" class="btn btn-sm btn-link text-decoration-none">Tout voir <i class="fa-solid fa-arrow-right"></i></a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Statut</th>
+                            <th class="text-end">Taille</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rec in recent %}
+                        <tr>
+                            <td class="small">{{ rec.started_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td><span class="badge bg-info text-dark">{{ rec.backup_type }}</span></td>
+                            <td>
+                                {% if rec.status == 'success' %}<span class="badge bg-success">Réussie</span>
+                                {% elif rec.status == 'failed' %}<span class="badge bg-danger" title="{{ rec.message }}">Échec</span>
+                                {% else %}<span class="badge bg-warning text-dark">En cours</span>{% endif %}
+                            </td>
+                            <td class="text-end small">{{ (rec.size_bytes / 1024 / 1024)|round(2) if rec.size_bytes else '--' }} Mo</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center text-muted py-4">Aucune sauvegarde pour le moment.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Sauvegarde manuelle -->
+<div class="modal fade" id="backupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-cloud-arrow-up text-warning me-2"></i>Lancer une sauvegarde</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('cloud_backup.start_backup') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Dossier de destination</label>
+                        <select class="form-select" name="backup_type">
+                            <option value="Manual">Archive (manuel)</option>
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Archive">Archive</option>
+                        </select>
+                    </div>
+                    <label class="form-label fw-semibold small">Données incluses</label>
+                    <div class="row g-2 mb-1">
+                        {% for key, group in groups.items() %}
+                        <div class="col-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="include_data" value="{{ key }}" id="inc_{{ key }}" checked>
+                                <label class="form-check-label small" for="inc_{{ key }}">{{ group.label }}</label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <small class="text-muted">Le dump SQL complet de la base est toujours inclus.</small>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-accent rounded-3"><i class="fa-solid fa-play me-1"></i> Démarrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+document.addEventListener('DOMContentLoaded', function () {
+    var freq = document.getElementById('frequency');
+    var dow = document.getElementById('dayOfWeekField');
+    var dom = document.getElementById('dayOfMonthField');
+    function toggle() {
+        if (freq) {
+            dow.style.display = freq.value === 'weekly' ? '' : 'none';
+            dom.style.display = freq.value === 'monthly' ? '' : 'none';
+        }
+    }
+    if (freq) freq.addEventListener('change', toggle);
+    toggle();
+
+    var gen = document.getElementById('genPass');
+    if (gen) gen.addEventListener('click', function () {
+        fetch('{{ url_for("cloud_backup.suggest_passphrase") }}', {cache: 'no-store'})
+            .then(function (r) { return r.json(); })
+            .then(function (d) { document.getElementById('passphrase').value = d.passphrase; });
+    });
+    var togglePass = document.getElementById('togglePass');
+    if (togglePass) togglePass.addEventListener('click', function () {
+        var el = document.getElementById('passphrase');
+        el.type = el.type === 'password' ? 'text' : 'password';
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Sauvegarde en cours - Ciento Immobilier{% endblock %}
+{% block header_title %}Sauvegarde Cloud en cours{% endblock %}
+
+{% block content %}
+<div class="card-premium mx-auto" style="max-width: 760px;">
+    <div class="text-center mb-4">
+        <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+            <i class="fa-solid fa-cloud-arrow-up text-primary fa-2x"></i>
+        </div>
+        <h5 class="fw-bold text-dark mb-1">Sauvegarde en cours</h5>
+        <p class="text-muted small mb-0" id="jobMessage">{{ status.message }}</p>
+    </div>
+
+    <div class="progress rounded-3 mb-2" style="height: 14px;">
+        <div id="jobBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width: {{ status.progress }}%"></div>
+    </div>
+    <div class="d-flex justify-content-between small text-muted mb-3">
+        <span id="jobPct">{{ status.progress|round|int }}%</span>
+        <span id="jobStep"></span>
+    </div>
+
+    <div class="row text-center g-2">
+        <div class="col-4">
+            <div class="border rounded-3 p-2">
+                <div class="fw-bold text-dark" id="jobUploaded">{{ (status.uploaded / 1024 / 1024)|round(2) if status.uploaded else 0 }} Mo</div>
+                <small class="text-muted">Téléversé</small>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="border rounded-3 p-2">
+                <div class="fw-bold text-dark" id="jobSpeed">{{ (status.speed / 1024)|round(1) if status.speed else 0 }} Ko/s</div>
+                <small class="text-muted">Vitesse</small>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="border rounded-3 p-2">
+                <div class="fw-bold text-dark" id="jobEta">--</div>
+                <small class="text-muted">Temps restant</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('cloud_backup.index') }}" class="btn btn-outline-secondary rounded-3"><i class="fa-solid fa-arrow-left me-1"></i> Retour</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce() }}">
+(function poll() {
+    fetch('{{ url_for("cloud_backup.status", job_id=job_id) }}', {cache: 'no-store'})
+        .then(function (r) {
+            if (r.status === 404) { window.location.href = '{{ url_for("cloud_backup.index") }}'; return null; }
+            return r.json();
+        })
+        .then(function (job) {
+            if (!job) return;
+            var bar = document.getElementById('jobBar');
+            var pct = Math.round(job.progress || 0);
+            bar.style.width = pct + '%';
+            document.getElementById('jobPct').textContent = pct + '%';
+            document.getElementById('jobMessage').textContent = job.message || '';
+            var uploaded = (job.uploaded || 0) / 1024 / 1024;
+            var total = (job.total_bytes || 0) / 1024 / 1024;
+            document.getElementById('jobUploaded').textContent = uploaded.toFixed(2) + ' / ' + (total > 0 ? total.toFixed(2) : '--') + ' Mo';
+            var speed = (job.speed || 0) / 1024;
+            document.getElementById('jobSpeed').textContent = (speed > 1024 ? (speed / 1024).toFixed(2) + ' Mo/s' : speed.toFixed(1) + ' Ko/s');
+            var eta = job.eta || 0;
+            document.getElementById('jobEta').textContent = eta > 0 ? Math.ceil(eta) + ' s' : '--';
+            if (job.status === 'success') {
+                setTimeout(function () { window.location.href = '{{ url_for("cloud_backup.backups") }}'; }, 1500);
+                return;
+            }
+            if (job.status === 'failed') {
+                setTimeout(function () { window.location.href = '{{ url_for("cloud_backup.index") }}'; }, 4000);
+                return;
+            }
+            setTimeout(poll, 800);
+        })
+        .catch(function () { setTimeout(poll, 2000); });
+})();
+</script>
+{% endblock %}

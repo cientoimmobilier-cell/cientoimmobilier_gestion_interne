@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Restauration - Ciento Immobilier{% endblock %}
+{% block header_title %}Restaurer une sauvegarde{% endblock %}
+
+{% block content %}
+<div class="card-premium mx-auto" style="max-width: 680px;">
+    <div class="alert alert-danger rounded-3">
+        <i class="fa-solid fa-triangle-exclamation me-1"></i>
+        <strong>Opération irréversible :</strong> la restauration <strong>remplace toute la base de données</strong>
+        actuelle par le contenu de la sauvegarde. Les données actuelles seront perdues.
+    </div>
+
+    <div class="mb-3">
+        <span class="badge bg-info text-dark">{{ record.backup_type }}</span>
+        <span class="badge {{ 'bg-success' if record.status == 'success' else 'bg-danger' }}">{{ record.status }}</span>
+    </div>
+    <dl class="row small mb-4">
+        <dt class="col-4 text-muted">Date</dt>
+        <dd class="col-8">{{ record.started_at.strftime('%d/%m/%Y %H:%M') }}</dd>
+        <dt class="col-4 text-muted">Fichier</dt>
+        <dd class="col-8 text-break">{{ record.file_name or '--' }}</dd>
+        <dt class="col-4 text-muted">Dossier</dt>
+        <dd class="col-8">{{ record.drive_folder or '--' }}</dd>
+        <dt class="col-4 text-muted">Taille</dt>
+        <dd class="col-8">{{ (record.size_bytes / 1024 / 1024)|round(2) if record.size_bytes else '--' }} Mo</dd>
+    </dl>
+
+    <form action="{{ url_for('cloud_backup.restore', record_id=record.id) }}" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Phrase de passe de chiffrement</label>
+            <input type="password" class="form-control" name="passphrase" required placeholder="Phrase de passe utilisée lors de la sauvegarde">
+            <small class="text-muted">Nécessaire pour déchiffrer l'archive AES-256 avant restauration.</small>
+        </div>
+        <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" name="confirm_restore" id="confirmRestore" required>
+            <label class="form-check-label" for="confirmRestore">
+                Je comprends que la base de données actuelle sera <strong>entièrement remplacée</strong>.
+            </label>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('cloud_backup.backups') }}" class="btn btn-light rounded-3">Annuler</a>
+            <button type="submit" class="btn btn-danger rounded-3"><i class="fa-solid fa-rotate-left me-1"></i> Restaurer la base de données</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

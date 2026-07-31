@@ -118,6 +118,11 @@
                         <i class="fa-solid fa-users-gear"></i> Paramètres
                     </a>
                 </li>
+                <li class="{% if request.blueprint == 'cloud_backup' %}active{% endif %}">
+                    <a href="{{ url_for('cloud_backup.index') }}">
+                        <i class="fa-brands fa-google-drive"></i> Sauvegarde Cloud
+                    </a>
+                </li>
                 <li class="{% if request.endpoint == 'dashboard.activities' %}active{% endif %}">
                     <a href="{{ url_for('dashboard.activities') }}">
                         <i class="fa-solid fa-shield-halved"></i> Journal d'activité
