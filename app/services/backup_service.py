@@ -82,6 +82,46 @@ def _parse_include(include_data):
             if k.strip() in REPORT_GROUPS}
 
 
+def _collect_upload_files(upload_root):
+    """Liste les fichiers présents sous upload_root (chemins relatifs)."""
+    if not upload_root or not os.path.isdir(upload_root):
+        return []
+    files = []
+    for root, _, names in os.walk(upload_root):
+        for name in names:
+            full = os.path.join(root, name)
+            files.append(os.path.relpath(full, upload_root))
+    return sorted(files)
+
+
+def _restore_upload_files(zf, prefix, target_dir):
+    """Restaure les membres `prefix/...` d'une archive zip vers target_dir.
+
+    Protège contre le zip-slip : chaque chemin est normalisé puis vérifié pour
+    rester sous target_dir avant écriture. Retourne le nombre de fichiers
+    restaurés.
+    """
+    if not target_dir:
+        return 0
+    prefix = prefix.rstrip('/') + '/'
+    target_abs = os.path.abspath(target_dir)
+    count = 0
+    for info in zf.infolist():
+        if not info.filename.startswith(prefix) or info.is_dir():
+            continue
+        rel = os.path.normpath(info.filename[len(prefix):])
+        if not rel or rel.startswith('..') or os.path.isabs(rel):
+            continue
+        dest = os.path.join(target_dir, rel)
+        if not os.path.abspath(dest).startswith(target_abs + os.sep):
+            continue
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with zf.open(info) as src, open(dest, 'wb') as out:
+            shutil.copyfileobj(src, out)
+        count += 1
+    return count
+
+
 class BackupService:
     def __init__(self, app):
         self.app = app
@@ -160,18 +200,22 @@ class BackupService:
                 fh.write(export_sql())
             file_count += 1
 
+            upload_root = (self.app.config.get('UPLOAD_FOLDER') or '')
+            upload_files = _collect_upload_files(upload_root)
+
             info_lines = [
                 'CIENTO IMMOBILIER — Sauvegarde automatique',
                 f'Type : {backup_type}',
                 f'Date : {datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M:%S")}',
                 f'Déclenchée par : {user_name}',
                 f'Données incluses : {", ".join(sorted(included))}',
+                f'Fichiers téléversés inclus : {len(upload_files)}',
                 f'Chiffrement : AES-256-GCM',
             ]
             with open(os.path.join(export_dir, 'INFORMATIONS.txt'), 'w',
                       encoding='utf-8') as fh:
                 fh.write('\n'.join(info_lines) + '\n')
-            file_count += 1
+            file_count += 1 + len(upload_files)
 
             self.progress.update(job_id, progress=42, message='Compression des fichiers...')
             zip_name = (f'ciento_backup_{backup_type}_{datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")}.zip')
@@ -181,6 +225,9 @@ class BackupService:
                     for name in files:
                         full = os.path.join(root, name)
                         zf.write(full, os.path.relpath(full, tmpdir))
+                for rel in upload_files:
+                    zf.write(os.path.join(upload_root, rel),
+                             os.path.join('uploads', rel))
 
             self.progress.update(job_id, progress=55, message='Chiffrement AES-256...')
             with open(zip_path, 'rb') as fh:
@@ -285,6 +332,8 @@ class BackupService:
             with zipfile.ZipFile(BytesIO(data)) as zf:
                 zf.extractall(tmpdir)
                 names = zf.namelist()
+                upload_root = (self.app.config.get('UPLOAD_FOLDER') or '')
+                _restore_upload_files(zf, 'uploads', upload_root)
             sql_name = next((n for n in names
                              if n.endswith('base_de_donnees.sql')), None)
             if not sql_name:

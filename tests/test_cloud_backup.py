@@ -1,5 +1,6 @@
 """Tests du module Sauvegarde Cloud Google Drive (AES-256, exports, backup/restore)."""
 import os
+import shutil
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -118,6 +119,8 @@ class CloudBackupTestCase(unittest.TestCase):
         self.app = create_app(TestConfig)
         self.app_context = self.app.app_context()
         self.app_context.push()
+        self._upload_dir = tempfile.mkdtemp(prefix='ciento_uploads_')
+        self.app.config['UPLOAD_FOLDER'] = self._upload_dir
         db.create_all()
         self.client = self.app.test_client()
 
@@ -125,6 +128,7 @@ class CloudBackupTestCase(unittest.TestCase):
         db.session.remove()
         db.drop_all()
         self.app_context.pop()
+        shutil.rmtree(self._upload_dir, ignore_errors=True)
 
     # ── helpers ──────────────────────────────────────────────────────────────
     def _login_admin(self):
@@ -223,6 +227,25 @@ class CloudBackupTestCase(unittest.TestCase):
         self.assertEqual(clients[0].code_client, 'CLI-T1')
 
     # ── Backup / restauration (Drive simulé) ────────────────────────────────
+    def test_restore_upload_files_blocks_zip_slip(self):
+        from app.services.backup_service import _restore_upload_files
+        import io
+        import zipfile as zf_mod
+
+        target = os.path.join(self._upload_dir, 'out')
+        os.makedirs(target)
+        buf = io.BytesIO()
+        with zf_mod.ZipFile(buf, 'w') as zf:
+            zf.writestr('uploads/normal.png', b'ok')
+            zf.writestr('uploads/../../evil.txt', b'boom')
+        buf.seek(0)
+        with zf_mod.ZipFile(buf) as zf:
+            count = _restore_upload_files(zf, 'uploads', target)
+        self.assertEqual(count, 1)
+        self.assertTrue(os.path.exists(os.path.join(target, 'normal.png')))
+        self.assertFalse(os.path.exists(os.path.join(
+            self._upload_dir, 'evil.txt')))
+
     def test_backup_flow_and_restore(self):
         self._seed_data()
         self._enable_setting()
@@ -231,6 +254,12 @@ class CloudBackupTestCase(unittest.TestCase):
         backup_service.GoogleDriveService = FakeGoogleDriveService
         FakeGoogleDriveService.reset_drive()
         try:
+            self._upload_photo = os.path.join(
+                self._upload_dir, 'photos', 'test_photo.png')
+            os.makedirs(os.path.dirname(self._upload_photo), exist_ok=True)
+            with open(self._upload_photo, 'wb') as fh:
+                fh.write(b'FAKE-PHOTO')
+
             service = backup_service.BackupService(self.app)
             service.progress.create('job-1')
             service._run_backup('job-1', 'Manual', 'Testeur', 'all')
@@ -241,20 +270,24 @@ class CloudBackupTestCase(unittest.TestCase):
             self.assertEqual(record.drive_folder, 'Archive')
             self.assertIsNotNone(record.drive_file_id)
             self.assertGreater(record.size_bytes, 0)
-            self.assertGreaterEqual(record.file_count, 8 + 3)  # 8 rapports*3 + sql + infos
+            self.assertGreaterEqual(record.file_count, 8 + 3 + 1)  # rapports*3 + sql + infos + upload
 
             status = service.progress.get('job-1')
             self.assertEqual(status['status'], 'success')
 
-            # On supprime les données puis on restaure
+            # On supprime les données ET les fichiers téléversés puis on restaure
+            os.remove(self._upload_photo)
             db.session.execute(Client.__table__.delete())
             db.session.commit()
             self.assertEqual(
                 len(db.session.execute(select(Client)).scalars().all()), 0)
+            self.assertFalse(os.path.exists(self._upload_photo))
 
             service.restore_backup(record.id, PASSPHRASE)
             clients = db.session.execute(select(Client)).scalars().all()
             self.assertEqual(len(clients), 2)
+            with open(self._upload_photo, 'rb') as fh:
+                self.assertEqual(fh.read(), b'FAKE-PHOTO')
         finally:
             backup_service.GoogleDriveService = original_class
 
