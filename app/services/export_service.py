@@ -208,7 +208,7 @@ def export_sql():
     if dialect_name == 'postgresql':
         for table in tables:
             int_pk = next((c for c in table.columns if c.primary_key), None)
-            if int_pk:
+            if int_pk is not None:
                 lines.append(
                     f"SELECT setval(pg_get_serial_sequence('{table.name}', '{int_pk.name}'), "
                     f"COALESCE((SELECT MAX({_ident(int_pk.name)}) FROM {_ident(table.name)}), 1));"
