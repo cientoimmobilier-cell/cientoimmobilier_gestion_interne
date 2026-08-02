@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
 from flask_wtf.csrf import CSRFProtect
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Initialisation des extensions
 db = SQLAlchemy()
@@ -19,6 +20,16 @@ def create_app(config_class=None):
     from config import Config
     app = Flask(__name__)
     app.config.from_object(config_class or Config)
+
+    # Derrière un reverse proxy (Render, Vercel, Nginx, Apache) Flask doit
+    # reconstruire l'URL et le schéma (http vs https) à partir des en-têtes
+    # X-Forwarded-*. Sans cela, l'URI de redirection OAuth Google serait
+    # générée en http et rejetée par Google. Chaque proxy est présumé unique
+    # (x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1).
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1,
+    )
 
     # ── Configuration du logging Python ─────────────────────────────────────
     # Format : timestamp | niveau | module | message

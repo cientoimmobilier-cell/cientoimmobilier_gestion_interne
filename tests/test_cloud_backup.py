@@ -14,6 +14,7 @@ from app.models import (
 )
 from app.services import backup_service, crypto_service, export_service
 from app.services.scheduler_service import compute_next_run
+from app.routes.cloud_backup import _redirect_uri
 
 
 class TestConfig(Config):
@@ -349,6 +350,156 @@ class CloudBackupTestCase(unittest.TestCase):
         response = self.client.get('/parametres/sauvegarde-cloud/statut/job-json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()['progress'], 42)
+
+    # ── OAuth (étape 1 : SameSite + ProxyFix + redirect URI) ──────────────
+    def test_config_samesite_is_lax(self):
+        from config import Config as RealConfig
+        self.assertEqual(RealConfig.SESSION_COOKIE_SAMESITE, 'Lax')
+
+    def test_proxyfix_middleware_applied(self):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        self.assertIsInstance(self.app.wsgi_app, ProxyFix)
+
+    def test_proxyfix_detects_https_scheme(self):
+        # Simule un reverse proxy : X-Forwarded-Proto: https
+        from flask import request
+        with self.app.test_request_context(
+                '/', environ_base={'HTTP_X_FORWARDED_PROTO': 'https',
+                                   'HTTP_HOST': 'ciento.example.com'}):
+            self.assertEqual(request.scheme, 'https')
+
+    def test_redirect_uri_override(self):
+        from flask import url_for
+        with self.app.app_context():
+            self.app.config['GOOGLE_OAUTH_REDIRECT_URI'] = \
+                'https://ciento.example.com/parametres/sauvegarde-cloud/callback'
+            self.assertEqual(_redirect_uri(), self.app.config['GOOGLE_OAUTH_REDIRECT_URI'])
+
+    def test_oauth_connect_saves_state_and_redirects(self):
+        import app.routes.cloud_backup as cb
+
+        class FakeOAuth:
+            def __init__(self, setting=None):
+                pass
+
+            def is_configured(self):
+                return True
+
+            def authorization_url(self, redirect_uri):
+                return ('https://accounts.google.com/o/oauth2/auth?x=1', 'state-xyz')
+
+        original = cb.GoogleDriveService
+        cb.GoogleDriveService = FakeOAuth
+        try:
+            self._login_admin()
+            resp = self.client.get('/parametres/sauvegarde-cloud/connexion')
+            self.assertEqual(resp.status_code, 302)
+            self.assertTrue(
+                resp.headers['Location'].startswith(
+                    'https://accounts.google.com/o/oauth2/auth'))
+            with self.client.session_transaction() as sess:
+                self.assertEqual(sess['cloud_oauth_state'], 'state-xyz')
+        finally:
+            cb.GoogleDriveService = original
+
+    def test_oauth_callback_success(self):
+        import app.routes.cloud_backup as cb
+
+        class FakeOAuth:
+            exchanged = []
+
+            def __init__(self, setting=None):
+                pass
+
+            def is_connected(self):
+                return False
+
+            def is_configured(self):
+                return False
+
+            def exchange_code(self, code, redirect_uri):
+                self.exchanged.append((code, redirect_uri))
+
+        original = cb.GoogleDriveService
+        cb.GoogleDriveService = FakeOAuth
+        try:
+            self._login_admin()
+            with self.client.session_transaction() as sess:
+                sess['cloud_oauth_state'] = 'state-xyz'
+            resp = self.client.get(
+                '/parametres/sauvegarde-cloud/callback',
+                query_string={'state': 'state-xyz', 'code': 'auth-code-123'})
+            self.assertEqual(resp.status_code, 302)
+            self.assertTrue(FakeOAuth.exchanged)
+            self.assertEqual(FakeOAuth.exchanged[0][0], 'auth-code-123')
+            self.assertIn('/parametres/sauvegarde-cloud/callback',
+                          FakeOAuth.exchanged[0][1])
+        finally:
+            cb.GoogleDriveService = original
+
+    def test_oauth_callback_rejects_wrong_state(self):
+        import app.routes.cloud_backup as cb
+
+        class FakeOAuth:
+            exchanged = []
+
+            def __init__(self, setting=None):
+                pass
+
+            def is_connected(self):
+                return False
+
+            def is_configured(self):
+                return False
+
+            def exchange_code(self, code, redirect_uri):
+                self.exchanged.append((code, redirect_uri))
+
+        original = cb.GoogleDriveService
+        cb.GoogleDriveService = FakeOAuth
+        try:
+            self._login_admin()
+            with self.client.session_transaction() as sess:
+                sess['cloud_oauth_state'] = 'expected-state'
+            resp = self.client.get(
+                '/parametres/sauvegarde-cloud/callback',
+                query_string={'state': 'evil-state', 'code': 'auth-code-123'},
+                follow_redirects=True)
+            self.assertEqual(resp.status_code, 200)
+            self.assertFalse(FakeOAuth.exchanged)
+            self.assertIn(b'session incorrect', resp.data)
+        finally:
+            cb.GoogleDriveService = original
+
+    def test_oauth_disconnect_clears_credentials(self):
+        import app.routes.cloud_backup as cb
+
+        class FakeOAuth:
+            cleared = []
+
+            def __init__(self, setting=None):
+                pass
+
+            def is_connected(self):
+                return False
+
+            def is_configured(self):
+                return False
+
+            def clear_credentials(self):
+                self.cleared.append(True)
+
+        original = cb.GoogleDriveService
+        cb.GoogleDriveService = FakeOAuth
+        try:
+            self._login_admin()
+            resp = self.client.post(
+                '/parametres/sauvegarde-cloud/deconnexion',
+                follow_redirects=True)
+            self.assertEqual(resp.status_code, 200)
+            self.assertTrue(FakeOAuth.cleared)
+        finally:
+            cb.GoogleDriveService = original
 
 
 if __name__ == '__main__':

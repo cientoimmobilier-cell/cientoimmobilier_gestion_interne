@@ -35,6 +35,15 @@ PASSPHRASE_MIN = crypto_service.MIN_PASSPHRASE_LENGTH
 
 
 def _redirect_uri():
+    """URI de redirection OAuth Google.
+
+    Priorité à une valeur explicite (GOOGLE_OAUTH_REDIRECT_URI), sinon
+    construction automatique. ProxyFix garantit le schéma https derrière un
+    reverse proxy.
+    """
+    override = current_app.config.get('GOOGLE_OAUTH_REDIRECT_URI')
+    if override:
+        return override
     return url_for('cloud_backup.callback', _external=True)
 
 

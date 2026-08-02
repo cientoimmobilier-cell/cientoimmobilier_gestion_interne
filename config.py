@@ -43,8 +43,16 @@ class Config:
 
     PREFERRED_URL_SCHEME = os.environ.get('PREFERRED_URL_SCHEME', 'https')
 
+    # URI de redirection OAuth Google. Optionnelle : si absente, elle est
+    # construite automatiquement (ProxyFix + url_for _external). À définir
+    # explicitement si l'auto-détection échoue derrière un proxy.
+    GOOGLE_OAUTH_REDIRECT_URI = os.environ.get('GOOGLE_OAUTH_REDIRECT_URI', '')
+
+    # SameSite=Lax : requis pour que le cookie de session (porteur de l'état
+    # OAuth) soit transmis lors de la redirection cross-site de Google vers le
+    # callback. SameSite=Strict bloquerait le callback OAuth.
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Strict')
+    SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'True').lower() in ('true', '1', 'yes')
     PERMANENT_SESSION_LIFETIME = int(os.environ.get('PERMANENT_SESSION_LIFETIME', '1800'))
 
