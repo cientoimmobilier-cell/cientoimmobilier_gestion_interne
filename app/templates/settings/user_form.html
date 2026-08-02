@@ -1,9 +1,16 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}{% if action == 'add' %}Ajouter{% else %}Modifier{% endif %} un collaborateur - Ciento Immobilier{% endblock %}
 {% block header_title %}{% if action == 'add' %}Nouveau collaborateur{% else %}Modifier {{ user.prenom }} {{ user.nom }}{% endif %}{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Nouveau collaborateur' if action == 'add' else 'Modifier un collaborateur',
+    breadcrumb_items=[('Paramètres - Utilisateurs', url_for('settings.list_users'))],
+    back_url=url_for('settings.list_users'),
+    next_url=request.args.get('next', '')
+) }}
 <div class="row justify-content-center">
     <div class="col-md-8">
         <div class="card-premium">

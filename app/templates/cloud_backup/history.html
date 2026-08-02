@@ -1,9 +1,16 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% from '_pagination.html' import render_pagination %}
 {% block title %}Historique des sauvegardes - Ciento Immobilier{% endblock %}
 {% block header_title %}Historique des sauvegardes cloud{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Historique des sauvegardes',
+    breadcrumb_items=[('Sauvegarde Cloud', url_for('cloud_backup.index'))],
+    back_url=url_for('cloud_backup.index'),
+    next_url=request.args.get('next', '')
+) }}
 <div class="card-premium">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list-ul text-warning me-2"></i>Historique complet</h5>

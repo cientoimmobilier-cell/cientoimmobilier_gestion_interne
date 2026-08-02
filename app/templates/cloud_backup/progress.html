@@ -1,8 +1,13 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% block title %}Sauvegarde en cours - Ciento Immobilier{% endblock %}
 {% block header_title %}Sauvegarde Cloud en cours{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Sauvegarde en cours',
+    back_url=url_for('cloud_backup.index')
+) }}
 <div class="card-premium mx-auto" style="max-width: 760px;">
     <div class="text-center mb-4">
         <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">

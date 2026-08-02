@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% from '_search_filters.html' import sort_link, search_form %}
 {% from '_pagination.html' import render_pagination %}
 
@@ -6,10 +7,14 @@
 {% block header_title %}Gestion des Utilisateurs{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Liste des collaborateurs',
+    back_url=url_for('dashboard.index')
+) }}
 <div class="card-premium">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-users-gear text-warning me-2"></i>Liste du personnel</h5>
-        <a href="{{ url_for('settings.add_user') }}" class="btn btn-accent rounded-3">
+        <a href="{{ url_for('settings.add_user', next=request.full_path.rstrip('?')) }}" class="btn btn-accent rounded-3">
             <i class="fa-solid fa-plus me-1"></i> Ajouter un collaborateur
         </a>
     </div>
@@ -57,7 +62,7 @@
                     </td>
                         <td class="text-end">
                         <div class="d-flex justify-content-end gap-1 flex-wrap">
-                            <a href="{{ url_for('settings.edit_user', id=user.id) }}" class="btn btn-sm btn-outline-primary rounded-3" title="Modifier">
+                            <a href="{{ url_for('settings.edit_user', id=user.id, next=request.full_path.rstrip('?')) }}" class="btn btn-sm btn-outline-primary rounded-3" title="Modifier">
                                 <i class="fa-solid fa-pen"></i>
                             </a>
                             {% if current_user.id != user.id %}

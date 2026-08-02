@@ -1,9 +1,16 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}Gestion des {{ type_mvt }}s - Ciento Immobilier{% endblock %}
 {% block header_title %}Gestion des {{ type_mvt }}s{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Gestion des ' ~ type_mvt ~ 's',
+    breadcrumb_items=[('Finance', url_for('finance.index'))],
+    back_url=url_for('finance.index'),
+    next_url=request.args.get('next', '')
+) }}
 <div class="row">
     <div class="col-12">
         <div class="card-premium">

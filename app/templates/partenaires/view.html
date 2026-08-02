@@ -1,9 +1,17 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}Détails du Partenaire - Ciento Immobilier{% endblock %}
 {% block header_title %}Fiche Partenaire{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Fiche Partenaire',
+    breadcrumb_items=[('Partenaires', url_for('partenaires.list_partenaires'))],
+    back_url=url_for('partenaires.list_partenaires'),
+    back_label='Retour à la liste',
+    next_url=request.args.get('next', '')
+) }}
 <div class="row">
     <div class="col-lg-8">
         <div class="card-premium mb-4">

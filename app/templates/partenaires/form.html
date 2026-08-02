@@ -1,9 +1,16 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}{{ action_title }} - Ciento Immobilier{% endblock %}
 {% block header_title %}{{ action_title }}{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    action_title,
+    breadcrumb_items=[('Partenaires', url_for('partenaires.list_partenaires'))],
+    back_url=url_for('partenaires.list_partenaires'),
+    next_url=request.args.get('next', '')
+) }}
 <div class="row justify-content-center">
     <div class="col-12 col-xl-10">
         <div class="card-premium">

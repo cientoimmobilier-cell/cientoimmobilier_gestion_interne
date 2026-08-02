@@ -25,6 +25,23 @@ COLUMNS_TO_ADD = {
     ],
 }
 
+# Colonnes dont la contrainte NOT NULL doit être levée.
+# Les contrats peuvent désormais être importés depuis une occupation sans
+# être rattachés à une transaction (transaction_id = NULL).
+DROP_NOT_NULL = {
+    'contrats': ['transaction_id'],
+}
+
+
+def _drop_not_null(conn, dialect, table, column):
+    if dialect == 'postgresql':
+        conn.execute(text(f'ALTER TABLE {table} ALTER COLUMN {column} DROP NOT NULL'))
+        logger.info(f'  Contrainte NOT NULL levée: {table}.{column}')
+    elif dialect == 'sqlite':
+        logger.info(f'  SQLite : colonne {table}.{column} ignorée (gérée par create_all).')
+    else:
+        logger.warning(f'  Dialecte non supporté pour {table}.{column} ({dialect}).')
+
 
 def migrate():
     with app.app_context():
@@ -54,6 +71,17 @@ def migrate():
             logger.info('Colonnes ajoutees avec succes.')
         else:
             logger.info('Aucune colonne manquante.')
+
+        logger.info('\nLever des contraintes NOT NULL...')
+        dialect = db.engine.dialect.name
+        with db.engine.connect() as conn:
+            for table, columns in DROP_NOT_NULL.items():
+                if table not in existing_tables:
+                    logger.info(f'  Table {table} n existe pas (ignore).')
+                    continue
+                for column in columns:
+                    _drop_not_null(conn, dialect, table, column)
+            conn.commit()
 
         logger.info('\nCreation des nouvelles tables...')
         db.create_all()

@@ -1,13 +1,21 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}{{ action_title }} - Ciento Immobilier{% endblock %}
 {% block header_title %}{{ action_title }}{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    action_title,
+    breadcrumb_items=[('Gestion des Occupations', url_for('occupation.dashboard')), ('Liste des occupations', url_for('occupation.list_occupations'))],
+    back_url=url_for('occupation.list_occupations'),
+    next_url=request.args.get('next', '')
+) }}
+
 <div class="row justify-content-center">
     <div class="col-lg-10">
         <div class="card-premium p-4">
-            <form method="POST" action="{{ url_for('occupation.edit_occupation', occ_id=occupation.id) if occupation else url_for('occupation.create_occupation') }}">
+            <form method="POST" id="occupation-form" action="{{ url_for('occupation.edit_occupation', occ_id=occupation.id) if occupation else url_for('occupation.create_occupation') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <div class="row g-4">
@@ -66,16 +74,48 @@
                             <i class="fa-solid fa-file-contract text-warning me-2"></i>Contrat de bail
                         </h6>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-12">
                         <label class="form-label fw-semibold text-muted small">Contrat <span class="text-danger">*</span></label>
-                        <select name="contrat_id" class="form-select form-control-premium" required>
-                            <option value="">Sélectionnez un contrat...</option>
-                            {% for ct in contrats %}
-                            <option value="{{ ct.id }}" {{ 'selected' if occupation and occupation.contrat_id == ct.id }}>
-                                {{ ct.numero_contrat }} - {{ ct.date_signature.strftime('%d/%m/%Y') if ct.date_signature else '' }}
-                            </option>
-                            {% endfor %}
-                        </select>
+                        <input type="hidden" name="contrat_id" id="contrat_id"
+                               value="{{ occupation.contrat_id if occupation and occupation.contrat_id else '' }}">
+
+                        {% set c = occupation.contrat if occupation and occupation.contrat else none %}
+                        <div id="contrat-empty" class="border rounded-3 p-4 text-center bg-light {{ 'd-none' if c }}">
+                            <i class="fa-solid fa-file-contract fa-2x text-muted mb-2"></i>
+                            <p class="text-muted mb-3">Aucun contrat associé. Importez un contrat existant (PDF ou document enregistré) ou recherchez-le dans le module Contrats.</p>
+                            <button type="button" class="btn btn-accent rounded-3" data-bs-toggle="modal" data-bs-target="#importContratModal">
+                                <i class="fa-solid fa-file-import me-2"></i>Importer un contrat
+                            </button>
+                        </div>
+
+                        <div id="contrat-selected-panel" class="card border-0 shadow-sm {{ 'd-none' if not c }}">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                                    <h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-link text-warning me-2"></i>Contrat lié</h6>
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-3" data-bs-toggle="modal" data-bs-target="#importContratModal">
+                                            <i class="fa-solid fa-magnifying-glass me-1"></i>Changer
+                                        </button>
+                                        <button type="button" id="contrat-remove" class="btn btn-outline-danger btn-sm rounded-3">
+                                            <i class="fa-solid fa-link-slash me-1"></i>Retirer
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-4"><div class="text-muted small">N° Contrat</div><div id="contrat-info-numero" class="fw-semibold font-monospace">--</div></div>
+                                    <div class="col-md-4"><div class="text-muted small">Date de signature</div><div id="contrat-info-signature">--</div></div>
+                                    <div class="col-md-4"><div class="text-muted small">Statut</div><div id="contrat-info-statut">--</div></div>
+                                    <div class="col-md-4"><div class="text-muted small">Date de début</div><div id="contrat-info-debut">--</div></div>
+                                    <div class="col-md-4"><div class="text-muted small">Date de fin</div><div id="contrat-info-fin">--</div></div>
+                                    <div class="col-md-4"><div class="text-muted small">Montant du loyer</div><div id="contrat-info-loyer">--</div></div>
+                                    <div class="col-md-4"><div class="text-muted small">Dépôt de garantie</div><div id="contrat-info-depot">--</div></div>
+                                    <div class="col-md-4"><div class="text-muted small">Nom du locataire</div><div id="contrat-info-locataire">--</div></div>
+                                    <div class="col-md-4"><div class="text-muted small">Nom du propriétaire</div><div id="contrat-info-proprietaire">--</div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="contrat-message" class="alert alert-danger rounded-3 mt-3 d-none mb-0" role="alert"></div>
                     </div>
 
                     <!-- Dates -->
@@ -121,4 +161,143 @@
         </div>
     </div>
 </div>
+
+{# Données initiales du contrat sélectionné (mode modification) #}
+{% set c = occupation.contrat if occupation and occupation.contrat else none %}
+<script type="application/json" id="occupation-contrat-initial">
+{{ {
+    'id': c.id if c else 0,
+    'numero': c.numero_contrat if c else '',
+    'date_signature': c.date_signature.strftime('%d/%m/%Y') if c and c.date_signature else '',
+    'date_debut': c.date_debut.strftime('%d/%m/%Y') if c and c.date_debut else '',
+    'date_fin': c.date_fin.strftime('%d/%m/%Y') if c and c.date_fin else '',
+    'montant_loyer': c.montant_loyer|float if c and c.montant_loyer is not none else none,
+    'depot_garantie': c.depot_garantie|float if c and c.depot_garantie is not none else none,
+    'statut': c.statut or '',
+    'mode_paiement': c.mode_paiement or '',
+    'frequence': c.frequence or '',
+    'locataire': (c.transaction.client.prenom ~ ' ' ~ c.transaction.client.nom) if c and c.transaction and c.transaction.client else '',
+    'proprietaire': (c.transaction.propriete.proprietaire.prenom ~ ' ' ~ c.transaction.propriete.proprietaire.nom) if c and c.transaction and c.transaction.propriete and c.transaction.propriete.proprietaire else ''
+}|tojson }}
+</script>
+
+<!-- MODAL: Import de contrat -->
+<div class="modal fade" id="importContratModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content rounded-3 shadow border-0">
+            <div class="modal-header border-bottom-0 bg-light rounded-top-3">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-file-import text-warning me-2"></i>Importer un contrat</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-4">
+                <ul class="nav nav-tabs nav-tabs-premium mb-4" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="contrat-search-tab" data-bs-toggle="tab" data-bs-target="#contrat-search-pane" type="button" role="tab">
+                            <i class="fa-solid fa-magnifying-glass me-1"></i>Rechercher un contrat existant
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="contrat-pdf-tab" data-bs-toggle="tab" data-bs-target="#contrat-pdf-pane" type="button" role="tab">
+                            <i class="fa-solid fa-file-pdf me-1"></i>Importer un PDF
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Onglet 1 : recherche -->
+                    <div class="tab-pane fade show active" id="contrat-search-pane" role="tabpanel">
+                        <form id="contrat-search-form" class="d-flex gap-2 mb-3">
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-end-0 rounded-start-3"><i class="fa-solid fa-search text-muted"></i></span>
+                                <input type="text" id="contrat-search-input" class="form-control border-start-0 rounded-end-3" placeholder="N° contrat, nom du locataire..." autocomplete="off">
+                            </div>
+                            <button type="submit" class="btn btn-premium rounded-3 px-3"><i class="fa-solid fa-sliders"></i></button>
+                        </form>
+                        <div id="contrat-search-loading" class="text-center text-muted py-3 d-none">
+                            <span class="spinner-border spinner-border-sm me-2"></span>Recherche en cours...
+                        </div>
+                        <div id="contrat-search-none" class="text-muted text-center py-3 d-none">Aucun contrat trouvé.</div>
+                        <div id="contrat-search-results"></div>
+                    </div>
+
+                    <!-- Onglet 2 : import PDF -->
+                    <div class="tab-pane fade" id="contrat-pdf-pane" role="tabpanel">
+                        <form id="contrat-pdf-form" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Numéro du contrat <span class="text-danger">*</span></label>
+                                    <input type="text" name="numero_contrat" class="form-control form-control-premium" placeholder="Ex : CNT-2026-0041" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Date de signature <span class="text-danger">*</span></label>
+                                    <input type="date" name="date_signature" class="form-control form-control-premium" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Date de début</label>
+                                    <input type="date" name="date_debut" class="form-control form-control-premium">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Date de fin</label>
+                                    <input type="date" name="date_fin" class="form-control form-control-premium">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Montant du loyer</label>
+                                    <input type="number" step="0.01" min="0" name="montant_loyer" class="form-control form-control-premium" placeholder="0.00">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Dépôt de garantie</label>
+                                    <input type="number" step="0.01" min="0" name="depot_garantie" class="form-control form-control-premium" placeholder="0.00">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Mode de paiement</label>
+                                    <select name="mode_paiement" class="form-select form-control-premium">
+                                        <option value="">--</option>
+                                        <option value="Espèces">Espèces</option>
+                                        <option value="Virement">Virement</option>
+                                        <option value="Chèque">Chèque</option>
+                                        <option value="Carte">Carte</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Fréquence</label>
+                                    <select name="frequence" class="form-select form-control-premium">
+                                        <option value="">--</option>
+                                        <option value="Mensuel">Mensuel</option>
+                                        <option value="Trimestriel">Trimestriel</option>
+                                        <option value="Semestriel">Semestriel</option>
+                                        <option value="Annuel">Annuel</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Statut</label>
+                                    <select name="statut" class="form-select form-control-premium">
+                                        <option value="Actif">Actif</option>
+                                        <option value="En attente">En attente</option>
+                                        <option value="Terminé">Terminé</option>
+                                        <option value="Résilié">Résilié</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-muted small">Fichier PDF <span class="text-danger">*</span></label>
+                                    <input class="form-control form-control-premium" type="file" name="contrat_pdf" accept=".pdf" required>
+                                    <small class="text-muted">PDF uniquement (max 15 Mo)</small>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end mt-4">
+                                <button type="submit" class="btn btn-accent rounded-3 px-4">
+                                    <i class="fa-solid fa-file-import me-2"></i>Importer et lier
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/occupation.js') }}" nonce="{{ csp_nonce() }}"></script>
 {% endblock %}

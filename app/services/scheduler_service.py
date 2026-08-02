@@ -81,12 +81,11 @@ class BackupScheduler:
 
     def _loop(self, app):
         while not self._stop.wait(30):
-            try:
-                with app.app_context():
+            with app.app_context():
+                try:
                     self._tick(app)
-            except Exception:
-                db.session.rollback()
-                continue
+                except Exception:
+                    db.session.rollback()
 
     def _tick(self, app):
         schedule = CloudBackupSchedule.get()

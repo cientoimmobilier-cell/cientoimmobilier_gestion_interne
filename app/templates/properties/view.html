@@ -1,9 +1,17 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}Fiche Immobilier - {{ property.reference_bien }}{% endblock %}
 {% block header_title %}Fiche du bien {{ property.reference_bien }}{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    property.reference_bien,
+    breadcrumb_items=[('Biens Immobiliers', url_for('properties.list_properties'))],
+    back_url=url_for('properties.list_properties'),
+    back_label='Retour à la liste',
+    next_url=request.args.get('next', '')
+) }}
 <div class="row">
     <!-- Colonne Gauche : Détails du bien et Galerie Photos -->
     <div class="col-lg-7 col-md-12">

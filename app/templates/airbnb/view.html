@@ -1,9 +1,17 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}{{ bien.titre }} - AirBNB - Ciento Immobilier{% endblock %}
 {% block header_title %}Fiche AirBNB #{{ bien.reference }}{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Fiche AirBNB #' ~ bien.reference,
+    breadcrumb_items=[('Gestion AirBNB', url_for('airbnb.list_biens'))],
+    back_url=url_for('airbnb.list_biens'),
+    back_label='Retour à la liste',
+    next_url=request.args.get('next', '')
+) }}
 <div class="row">
     <!-- Colonne Gauche : Détails du bien -->
     <div class="col-lg-4 col-md-12">

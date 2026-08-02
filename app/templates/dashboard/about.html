@@ -1,8 +1,14 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% block title %}À propos - Ciento Immobilier{% endblock %}
 {% block header_title %}À propos{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'À propos',
+    breadcrumb_items=[('Accueil', url_for('dashboard.index'))],
+    back_url=url_for('dashboard.index')
+) }}
 <div class="row justify-content-center">
     <div class="col-xl-6 col-lg-8">
         <div class="card-premium text-center">

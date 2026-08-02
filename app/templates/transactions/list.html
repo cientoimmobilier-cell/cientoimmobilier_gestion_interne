@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% from '_search_filters.html' import sort_link, search_form %}
 {% from '_pagination.html' import render_pagination %}
 
@@ -6,6 +7,10 @@
 {% block header_title %}Transactions Commerciales{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Liste des transactions',
+    back_url=url_for('dashboard.index')
+) }}
 <div class="row">
     <div class="col-12">
         <div class="card-premium">
@@ -41,7 +46,7 @@
                     
                     <a href="{{ url_for('transactions.export_transactions', search=search, type_transaction=type_transaction, statut=statut) }}" class="btn btn-success rounded-3"><i class="fa-solid fa-file-excel me-1"></i> Exporter</a>
 
-                    <a href="{{ url_for('transactions.add_transaction') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-1"></i> Saisir Transaction</a>
+                    <a href="{{ url_for('transactions.add_transaction', next=request.full_path.rstrip('?')) }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-1"></i> Saisir Transaction</a>
                 </div>
             </div>
 
@@ -85,9 +90,9 @@
                                 </span>
                             </td>
                             <td class="text-end">
-                                <a href="{{ url_for('transactions.view_transaction', tx_id=tx.id) }}" class="btn btn-sm btn-outline-primary rounded-3 me-1" title="Détails / Contrats"><i class="fa-solid fa-eye"></i></a>
+                                <a href="{{ url_for('transactions.view_transaction', tx_id=tx.id, next=request.full_path.rstrip('?')) }}" class="btn btn-sm btn-outline-primary rounded-3 me-1" title="Détails / Contrats"><i class="fa-solid fa-eye"></i></a>
                                 {% if current_user.role in ['Administrateur', 'Directeur'] %}
-                                <a href="{{ url_for('transactions.edit_transaction', tx_id=tx.id) }}" class="btn btn-sm btn-outline-warning rounded-3 me-1" title="Modifier"><i class="fa-solid fa-pen"></i></a>
+                                <a href="{{ url_for('transactions.edit_transaction', tx_id=tx.id, next=request.full_path.rstrip('?')) }}" class="btn btn-sm btn-outline-warning rounded-3 me-1" title="Modifier"><i class="fa-solid fa-pen"></i></a>
                                 <form action="{{ url_for('transactions.delete_transaction', tx_id=tx.id) }}" method="POST" class="d-inline" data-confirm="Êtes-vous sûr de vouloir supprimer cette transaction ? Le bien immobilier associé redeviendra disponible.">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Supprimer"><i class="fa-solid fa-trash-can"></i></button>

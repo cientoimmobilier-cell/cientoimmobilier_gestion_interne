@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% from '_search_filters.html' import sort_link, search_form %}
 {% from '_pagination.html' import render_pagination %}
 
@@ -6,6 +7,10 @@
 {% block header_title %}Catalogue Immobilier{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Liste des biens',
+    back_url=url_for('dashboard.index')
+) }}
 <div class="row">
     <!-- Barre de filtres de recherche -->
     <div class="col-12 mb-4">
@@ -63,7 +68,7 @@
         {% if current_user.role in ['Administrateur', 'Directeur'] %}
         <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-toggle="modal" data-bs-target="#importPropertiesModal"><i class="fa-solid fa-file-import me-2"></i>Importer Excel</button>
         {% endif %}
-        <a href="{{ url_for('properties.add_property') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un bien</a>
+        <a href="{{ url_for('properties.add_property', next=request.full_path.rstrip('?')) }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un bien</a>
     </div>
 </div>
 
@@ -128,7 +133,7 @@
                         <span class="property-price">{{ prop.prix | format_price(prop.devise) }}</span>
                     </div>
                     
-                    <a href="{{ url_for('properties.view_property', property_id=prop.id) }}" class="btn btn-premium btn-sm rounded-3">Voir la fiche</a>
+                    <a href="{{ url_for('properties.view_property', property_id=prop.id, next=request.full_path.rstrip('?')) }}" class="btn btn-premium btn-sm rounded-3">Voir la fiche</a>
                 </div>
             </div>
         </div>

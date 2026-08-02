@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% from '_search_filters.html' import sort_link, search_form %}
 {% from '_pagination.html' import render_pagination %}
 
@@ -6,6 +7,10 @@
 {% block header_title %}Portefeuille Clients{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Liste des clients',
+    back_url=url_for('dashboard.index')
+) }}
 <div class="row">
     <div class="col-12">
         <div class="card-premium">
@@ -30,7 +35,7 @@
                     {% if current_user.role in ['Administrateur', 'Directeur'] %}
                     <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-toggle="modal" data-bs-target="#importClientsModal"><i class="fa-solid fa-file-import me-2"></i>Importer</button>
                     {% endif %}
-                    <a href="{{ url_for('clients.add_client') }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un client</a>
+                    <a href="{{ url_for('clients.add_client', next=request.full_path.rstrip('?')) }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-2"></i>Ajouter un client</a>
                 </div>
             </div>
 
@@ -59,8 +64,8 @@
                             <td>{{ client.ville or 'N/A' }}</td>
                             <td>{{ client.profession or 'N/A' }}</td>
                             <td class="text-end">
-                                <a href="{{ url_for('clients.view_client', client_id=client.id) }}" class="btn btn-sm btn-outline-primary rounded-3 me-1" title="Voir les détails"><i class="fa-solid fa-eye"></i></a>
-                                <a href="{{ url_for('clients.edit_client', client_id=client.id) }}" class="btn btn-sm btn-outline-secondary rounded-3 me-1" title="Modifier"><i class="fa-solid fa-pen"></i></a>
+                                <a href="{{ url_for('clients.view_client', client_id=client.id, next=request.full_path.rstrip('?')) }}" class="btn btn-sm btn-outline-primary rounded-3 me-1" title="Voir les détails"><i class="fa-solid fa-eye"></i></a>
+                                <a href="{{ url_for('clients.edit_client', client_id=client.id, next=request.full_path.rstrip('?')) }}" class="btn btn-sm btn-outline-secondary rounded-3 me-1" title="Modifier"><i class="fa-solid fa-pen"></i></a>
                                 {% if current_user.role in ['Administrateur', 'Directeur'] %}
                                 <form action="{{ url_for('clients.delete_client', client_id=client.id) }}" method="POST" class="d-inline" data-confirm="Êtes-vous sûr de vouloir supprimer ce client ? Toutes ses demandes et visites associées seront également supprimées.">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

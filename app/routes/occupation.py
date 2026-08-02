@@ -3,19 +3,19 @@ import traceback
 from io import BytesIO
 from datetime import datetime, timezone, date
 
-from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, current_app, send_file
+from flask import Blueprint, render_template, redirect, url_for, request, flash, abort, current_app, send_file, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import select, func as sa_func
 
 from app import db
 from app.models import (
     Occupation, Occupant, RapportVisite, DocumentOccupation,
-    Client, Propriete, Contrat, Utilisateur, Proprietaire
+    Client, Propriete, Contrat, Utilisateur, Proprietaire, Transaction
 )
 from app.utils.helpers import log_activity, role_required, sanitize_search, safe_path_join
 from app.utils.upload_security import (
     validate_and_save_upload, UploadValidationError,
-    ALLOWED_DOCUMENTS, ALLOWED_IMAGES
+    ALLOWED_DOCUMENTS, ALLOWED_IMAGES, ALLOWED_PDFS
 )
 from app.services.excel_service import export_occupations_to_excel
 from app.services.pdf_service import generate_occupation_fiche_pdf
@@ -48,6 +48,149 @@ def _update_propriete_statut(propriete_id, statut):
 
 def _log(user_id, action, table='occupations', record_id=None):
     log_activity(user_id, action, table, record_id)
+
+
+def _to_decimal(value):
+    """Convertit une valeur de formulaire en float si possible, sinon None."""
+    if value is None or value == '':
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _serialize_contrat(c):
+    """Sérialise un contrat pour l'import AJAX dans le formulaire d'occupation."""
+    tx = c.transaction
+    client = tx.client if tx else None
+    propriete = tx.propriete if tx else None
+    proprietaire = propriete.proprietaire if propriete else None
+    return {
+        'id': c.id,
+        'numero': c.numero_contrat,
+        'date_signature': c.date_signature.strftime('%d/%m/%Y') if c.date_signature else '',
+        'date_debut': c.date_debut.strftime('%d/%m/%Y') if c.date_debut else '',
+        'date_fin': c.date_fin.strftime('%d/%m/%Y') if c.date_fin else '',
+        'montant_loyer': float(c.montant_loyer) if c.montant_loyer is not None else None,
+        'depot_garantie': float(c.depot_garantie) if c.depot_garantie is not None else None,
+        'statut': c.statut or '--',
+        'mode_paiement': c.mode_paiement or '--',
+        'frequence': c.frequence or '--',
+        'locataire': (f"{client.prenom} {client.nom}").strip() if client else '',
+        'proprietaire': (f"{proprietaire.prenom} {proprietaire.nom}").strip() if proprietaire else '',
+        'lien_pdf': c.fichier_pdf or '',
+    }
+
+
+# ── Import de contrats (AJAX / JSON) ─────────────────────────────────
+
+@occupation.route('/contrats/recherche')
+@login_required
+@role_required('Agent immobilier')
+def search_contracts():
+    """Recherche AJAX de contrats existants pour lier à une occupation."""
+    q = sanitize_search(request.args.get('q', '').strip())
+    exclude_id = request.args.get('exclude_id', type=int)
+    try:
+        stmt = select(Contrat).join(Transaction, Contrat.transaction_id == Transaction.id, isouter=True)
+        if q:
+            like = f'%{q}%'
+            stmt = stmt.join(Client, Transaction.client_id == Client.id, isouter=True).where(
+                db.or_(
+                    Contrat.numero_contrat.ilike(like),
+                    Client.nom.ilike(like),
+                    Client.prenom.ilike(like),
+                )
+            )
+        if exclude_id:
+            stmt = stmt.where(Contrat.id != exclude_id)
+        stmt = stmt.order_by(Contrat.id.desc()).limit(50)
+        contrats = db.session.execute(stmt).scalars().all()
+        return jsonify({'ok': True, 'contrats': [_serialize_contrat(c) for c in contrats]})
+    except Exception as e:
+        logger.error(f'[OCCUPATION] Échec recherche contrats: {e}')
+        logger.error(traceback.format_exc())
+        return jsonify({'ok': False, 'error': 'Erreur lors de la recherche de contrats.'}), 500
+
+
+@occupation.route('/contrats/importer-pdf', methods=['POST'])
+@login_required
+@role_required('Agent immobilier')
+def import_contract_pdf():
+    """Import AJAX d'un contrat PDF : crée un Contrat puis le lie à l'occupation."""
+    numero = (request.form.get('numero_contrat') or '').strip()
+    date_sig_str = request.form.get('date_signature')
+    date_deb_str = request.form.get('date_debut') or None
+    date_fin_str = request.form.get('date_fin') or None
+
+    if not numero:
+        return jsonify({'ok': False, 'error': 'Le numéro de contrat est obligatoire.'}), 400
+    if not date_sig_str:
+        return jsonify({'ok': False, 'error': 'La date de signature est obligatoire.'}), 400
+
+    existing = db.session.execute(
+        select(Contrat).where(Contrat.numero_contrat == numero)
+    ).scalars().first()
+    if existing:
+        return jsonify({'ok': False, 'error': f'Le contrat "{numero}" existe déjà dans le système.'}), 400
+
+    try:
+        date_signature = datetime.strptime(date_sig_str, '%Y-%m-%d').date()
+        date_debut = datetime.strptime(date_deb_str, '%Y-%m-%d').date() if date_deb_str else None
+        date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date() if date_fin_str else None
+    except (ValueError, TypeError):
+        return jsonify({'ok': False, 'error': 'Format de date invalide.'}), 400
+
+    if date_debut and date_fin and date_debut >= date_fin:
+        return jsonify({'ok': False, 'error': 'La date de début doit être antérieure à la date de fin.'}), 400
+
+    rel_path = None
+    safe_path = None
+    file = request.files.get('contrat_pdf')
+    if file and file.filename:
+        max_size = current_app.config.get('MAX_FILE_SIZE_PDF', 15 * 1024 * 1024)
+        try:
+            safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
+                file_storage=file,
+                upload_subdir='uploads/documents',
+                allowed_extensions=ALLOWED_PDFS,
+                max_size=max_size,
+                category='pdf',
+                validate_magic=True,
+                prefix='CONTRAT_',
+                user_id=current_user.id
+            )
+        except UploadValidationError as e:
+            return jsonify({'ok': False, 'error': e.message}), 400
+
+    contrat = Contrat(
+        transaction_id=None,
+        numero_contrat=numero,
+        date_signature=date_signature,
+        date_debut=date_debut,
+        date_fin=date_fin,
+        montant_loyer=_to_decimal(request.form.get('montant_loyer')),
+        depot_garantie=_to_decimal(request.form.get('depot_garantie')),
+        mode_paiement=request.form.get('mode_paiement') or None,
+        frequence=request.form.get('frequence') or None,
+        statut=request.form.get('statut') or 'Actif',
+        fichier_pdf=rel_path,
+    )
+
+    try:
+        db.session.add(contrat)
+        db.session.flush()
+        _log(current_user.id, f'Import contrat PDF: {numero} (occupation)', 'contrats', contrat.id)
+        db.session.commit()
+        return jsonify({'ok': True, 'contrat': _serialize_contrat(contrat)})
+    except Exception as e:
+        db.session.rollback()
+        if safe_path and os.path.exists(safe_path):
+            os.remove(safe_path)
+        logger.error(f'[OCCUPATION] Échec import contrat: {e}')
+        logger.error(traceback.format_exc())
+        return jsonify({'ok': False, 'error': 'Erreur lors de l\'import du contrat.'}), 500
 
 
 # ── Dashboard ─────────────────────────────────────────────────────────
@@ -231,7 +374,7 @@ def create_occupation():
                 agents_list=agents_list, action_title='Nouvelle occupation')
 
         if not contrat_id:
-            flash("Veuillez sélectionner un contrat de bail.", 'danger')
+            flash("Un contrat de bail valide est obligatoire. Importez ou recherchez un contrat existant.", 'danger')
             return render_template('occupation/form.html', occupation=None,
                 clients=clients, biens=biens, contrats=contrats,
                 agents_list=agents_list, action_title='Nouvelle occupation')
@@ -347,6 +490,12 @@ def edit_occupation(occ_id):
         occ.propriete_id = request.form.get('propriete_id', type=int)
         occ.contrat_id = request.form.get('contrat_id', type=int)
         occ.agent_id = request.form.get('agent_id', type=int)
+
+        if not occ.contrat_id:
+            flash('Un contrat valide doit être associé à l\'occupation.', 'danger')
+            return render_template('occupation/form.html', occupation=occ,
+                clients=clients, biens=biens, contrats=contrats,
+                agents_list=agents_list, action_title=f'Modifier {occ.numero_occupation}')
 
         date_entree_str = request.form.get('date_entree')
         date_sortie_prevue_str = request.form.get('date_sortie_prevue')

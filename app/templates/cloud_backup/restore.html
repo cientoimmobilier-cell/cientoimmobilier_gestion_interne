@@ -1,8 +1,14 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% block title %}Restauration - Ciento Immobilier{% endblock %}
 {% block header_title %}Restaurer une sauvegarde{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Restaurer une sauvegarde',
+    breadcrumb_items=[('Sauvegarde Cloud', url_for('cloud_backup.index'))],
+    back_url=url_for('cloud_backup.index')
+) }}
 <div class="card-premium mx-auto" style="max-width: 680px;">
     <div class="alert alert-danger rounded-3">
         <i class="fa-solid fa-triangle-exclamation me-1"></i>

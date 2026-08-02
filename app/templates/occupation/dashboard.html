@@ -1,9 +1,14 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}Dashboard Occupations - Ciento Immobilier{% endblock %}
 {% block header_title %}Dashboard Occupations{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Dashboard Occupations',
+    back_url=url_for('dashboard.index')
+) }}
 <div class="row g-4 mb-4">
     <div class="col-xl-3 col-lg-6 col-md-6">
         <div class="card-premium d-flex align-items-center p-3">

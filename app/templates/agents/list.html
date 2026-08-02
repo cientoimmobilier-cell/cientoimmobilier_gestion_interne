@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% from '_search_filters.html' import sort_link, search_form %}
 {% from '_pagination.html' import render_pagination %}
 
@@ -6,10 +7,14 @@
 {% block header_title %}Agents Externes{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Liste des agents externes',
+    back_url=url_for('dashboard.index')
+) }}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h5 class="fw-bold text-dark mb-0">Liste des agents externes</h5>
     {% if current_user.role in ['Administrateur', 'Directeur'] %}
-    <a href="{{ url_for('agents.add_agent') }}" class="btn btn-accent rounded-3 px-4 shadow-sm">
+    <a href="{{ url_for('agents.add_agent', next=request.full_path.rstrip('?')) }}" class="btn btn-accent rounded-3 px-4 shadow-sm">
         <i class="fa-solid fa-plus me-2"></i>Ajouter un agent
     </a>
     {% endif %}
@@ -107,11 +112,11 @@
             </div>
 
             <div class="d-flex gap-2">
-                <a href="{{ url_for('agents.view_agent', agent_id=agent.id) }}" class="btn btn-premium btn-sm flex-grow-1 rounded-3">
+                <a href="{{ url_for('agents.view_agent', agent_id=agent.id, next=request.full_path.rstrip('?')) }}" class="btn btn-premium btn-sm flex-grow-1 rounded-3">
                     <i class="fa-solid fa-eye me-1"></i>Voir
                 </a>
                 {% if current_user.role in ['Administrateur', 'Directeur'] %}
-                <a href="{{ url_for('agents.edit_agent', agent_id=agent.id) }}" class="btn btn-outline-secondary btn-sm flex-grow-1 rounded-3">
+                <a href="{{ url_for('agents.edit_agent', agent_id=agent.id, next=request.full_path.rstrip('?')) }}" class="btn btn-outline-secondary btn-sm flex-grow-1 rounded-3">
                     <i class="fa-solid fa-pen me-1"></i>Modifier
                 </a>
                 <form action="{{ url_for('agents.toggle_agent', agent_id=agent.id) }}" method="POST" class="flex-grow-1 m-0">

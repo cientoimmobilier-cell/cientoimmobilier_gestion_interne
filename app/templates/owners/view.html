@@ -1,9 +1,17 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}Profil Propriétaire - {{ owner.prenom }} {{ owner.nom }}{% endblock %}
 {% block header_title %}Fiche Propriétaire{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    owner.prenom ~ ' ' ~ owner.nom,
+    breadcrumb_items=[('Propriétaires', url_for('owners.list_owners'))],
+    back_url=url_for('owners.list_owners'),
+    back_label='Retour à la liste',
+    next_url=request.args.get('next', '')
+) }}
 <div class="row">
     <!-- Colonne Gauche : Détails du Propriétaire -->
     <div class="col-lg-4 col-md-12 mb-4">

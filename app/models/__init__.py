@@ -236,7 +236,7 @@ class Contrat(db.Model):
     __tablename__ = 'contrats'
     
     id = db.Column(db.Integer, primary_key=True)
-    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='CASCADE'), nullable=False)
+    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='CASCADE'))
     numero_contrat = db.Column(db.String(50), nullable=False)
     date_signature = db.Column(db.Date, nullable=False)
     date_debut = db.Column(db.Date)

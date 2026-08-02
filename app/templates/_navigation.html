@@ -1,0 +1,54 @@
+{#
+    Macros de navigation homogènes pour toute l'application (DRY / SOLID).
+
+    Comportement du bouton Retour :
+    1. Si une URL `next` (filtres + pagination conservés) est fournie -> on y va.
+    2. Sinon, si l'historique du navigateur existe -> history.back().
+    3. Sinon -> URL de repli de la liste principale du module (`back_url`).
+    Fonctionne aussi bien sous Flask que sous PyWebView/Desktop.
+#}
+
+{% macro render_back_button(fallback_url='', label='Retour', next_url='') %}
+<button type="button" class="btn btn-outline-secondary rounded-3 btn-back"
+        data-fallback="{{ fallback_url or '#' }}"
+        data-next="{{ next_url or '' }}"
+        title="Revenir à la page précédente">
+    <i class="fa-solid fa-arrow-left me-1"></i>{{ label }}
+</button>
+{% endmacro %}
+
+{% macro render_breadcrumb(items, current_title) %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-0 bg-transparent py-1 px-0">
+        <li class="breadcrumb-item">
+            <a href="{{ url_for('dashboard.index') }}" class="text-decoration-none">
+                <i class="fa-solid fa-house me-1"></i>Accueil
+            </a>
+        </li>
+        {% for label, url in items %}
+        <li class="breadcrumb-item">
+            <a href="{{ url }}" class="text-decoration-none">{{ label }}</a>
+        </li>
+        {% endfor %}
+        <li class="breadcrumb-item active" aria-current="page">{{ current_title }}</li>
+    </ol>
+</nav>
+{% endmacro %}
+
+{#
+    Bandeau de navigation standard à placer en haut de chaque page :
+    bouton Retour à gauche, fil d'Ariane à droite.
+
+    Paramètres :
+      current_title    : titre de la page courante (dernier élément du fil d'Ariane).
+      breadcrumb_items : liste de tuples (libellé, url) précédant la page courante.
+      back_url         : URL de repli du bouton Retour (liste du module) si aucun historique.
+      back_label       : libellé du bouton Retour (défaut 'Retour').
+      next_url         : URL conservant filtres/pagination (via le paramètre ?next=).
+#}
+{% macro page_navigation(current_title, breadcrumb_items=[], back_url='', back_label='Retour', next_url='') %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    {{ render_back_button(back_url, back_label, next_url) }}
+    {{ render_breadcrumb(breadcrumb_items, current_title) }}
+</div>
+{% endmacro %}

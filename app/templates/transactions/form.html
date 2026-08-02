@@ -1,9 +1,16 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}Enregistrer une Transaction - Ciento Immobilier{% endblock %}
 {% block header_title %}Saisie de Transaction Commerciale{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Enregistrer une transaction',
+    breadcrumb_items=[('Transactions', url_for('transactions.list_transactions'))],
+    back_url=url_for('transactions.list_transactions'),
+    next_url=request.args.get('next', '')
+) }}
 <div class="row justify-content-center">
     <div class="col-lg-10 col-md-12">
         <div class="card-premium">

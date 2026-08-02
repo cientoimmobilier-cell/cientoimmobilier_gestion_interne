@@ -1,9 +1,15 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}Journal d'activités - Ciento Immobilier{% endblock %}
 {% block header_title %}Sécurité & Journal d'Audit{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    "Journal d'activités",
+    breadcrumb_items=[('Accueil', url_for('dashboard.index'))],
+    back_url=url_for('dashboard.index')
+) }}
 <div class="row">
     <div class="col-12">
         <div class="card-premium">

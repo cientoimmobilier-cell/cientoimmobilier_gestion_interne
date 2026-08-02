@@ -1,9 +1,16 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}Saisie Fiche Immobilière - Ciento Immobilier{% endblock %}
 {% block header_title %}{{ action_title }}{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    action_title,
+    breadcrumb_items=[('Biens Immobiliers', url_for('properties.list_properties'))],
+    back_url=url_for('properties.list_properties'),
+    next_url=request.args.get('next', '')
+) }}
 <div class="row justify-content-center">
     <div class="col-lg-10 col-md-12">
         <div class="card-premium">

@@ -1,9 +1,17 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}Agent {{ agent.prenom }} {{ agent.nom }} - Ciento Immobilier{% endblock %}
 {% block header_title %}Fiche Agent{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Fiche Agent',
+    breadcrumb_items=[('Agents externes', url_for('agents.list_agents'))],
+    back_url=url_for('agents.list_agents'),
+    back_label='Retour à la liste',
+    next_url=request.args.get('next', '')
+) }}
 <div class="row">
     <!-- Colonne Gauche : Profil Agent -->
     <div class="col-lg-4 col-md-12">

@@ -1,9 +1,16 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% from '_pagination.html' import render_pagination %}
 {% block title %}Mes sauvegardes - Ciento Immobilier{% endblock %}
 {% block header_title %}Mes sauvegardes cloud{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Mes sauvegardes',
+    breadcrumb_items=[('Sauvegarde Cloud', url_for('cloud_backup.index'))],
+    back_url=url_for('cloud_backup.index'),
+    next_url=request.args.get('next', '')
+) }}
 <div class="row g-3 mb-3">
     <div class="col-lg-9">
         <div class="card-premium">

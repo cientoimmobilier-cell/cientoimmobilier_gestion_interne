@@ -1,9 +1,17 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 
 {% block title %}{{ occ.numero_occupation }} - Ciento Immobilier{% endblock %}
 {% block header_title %}{{ occ.numero_occupation }}{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    occ.numero_occupation,
+    breadcrumb_items=[('Gestion des Occupations', url_for('occupation.dashboard')), ('Liste des occupations', url_for('occupation.list_occupations'))],
+    back_url=url_for('occupation.list_occupations'),
+    back_label='Retour à la liste',
+    next_url=request.args.get('next', '')
+) }}
 <div class="row">
     <!-- En-tête avec statut et actions -->
     <div class="col-12 mb-4">

@@ -47,6 +47,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     });
 
+    // Boutons "Retour" — comportement intelligent (Flask + PyWebView/Desktop)
+    document.querySelectorAll('.btn-back').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var next = btn.getAttribute('data-next') || '';
+            var fallback = btn.getAttribute('data-fallback') || '';
+
+            // 1) URL explicite (filtres + pagination conservés)
+            if (next && next.charAt(0) === '/' && next.charAt(1) !== '/') {
+                window.location.href = next;
+                return;
+            }
+            // 2) Historique du navigateur existant
+            if (window.history.length > 1) {
+                window.history.back();
+                return;
+            }
+            // 3) Liste principale du module concerné
+            if (fallback && fallback.charAt(0) === '/' && fallback.charAt(1) !== '/') {
+                window.location.href = fallback;
+            }
+        });
+    });
+
     // Prévisualisation d'image pour l'upload de photos
     const photoInput = document.getElementById('photo-input');
     const photoPreview = document.getElementById('photo-preview');

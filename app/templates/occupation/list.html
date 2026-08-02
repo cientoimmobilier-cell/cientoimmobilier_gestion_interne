@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_navigation.html' import page_navigation %}
 {% from '_search_filters.html' import sort_link, search_form %}
 {% from '_pagination.html' import render_pagination %}
 
@@ -6,6 +7,11 @@
 {% block header_title %}Gestion des Occupations{% endblock %}
 
 {% block content %}
+{{ page_navigation(
+    'Liste des occupations',
+    back_url=url_for('dashboard.index')
+) }}
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h5 class="fw-bold text-dark mb-0">Liste des occupations</h5>
     <div class="d-flex gap-2">
@@ -13,7 +19,7 @@
             <i class="fa-solid fa-file-excel me-2"></i>Exporter
         </a>
         {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
-        <a href="{{ url_for('occupation.create_occupation') }}" class="btn btn-accent rounded-3">
+        <a href="{{ url_for('occupation.create_occupation', next=request.full_path.rstrip('?')) }}" class="btn btn-accent rounded-3">
             <i class="fa-solid fa-plus me-2"></i>Nouvelle occupation
         </a>
         {% endif %}
@@ -108,11 +114,11 @@
                         {% endif %}
                     </td>
                     <td class="text-end">
-                        <a href="{{ url_for('occupation.view_occupation', occ_id=occ.id) }}" class="btn btn-sm btn-outline-primary rounded-3" title="Voir">
+                        <a href="{{ url_for('occupation.view_occupation', occ_id=occ.id, next=request.full_path.rstrip('?')) }}" class="btn btn-sm btn-outline-primary rounded-3" title="Voir">
                             <i class="fa-solid fa-eye"></i>
                         </a>
                         {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
-                        <a href="{{ url_for('occupation.edit_occupation', occ_id=occ.id) }}" class="btn btn-sm btn-outline-secondary rounded-3" title="Modifier">
+                        <a href="{{ url_for('occupation.edit_occupation', occ_id=occ.id, next=request.full_path.rstrip('?')) }}" class="btn btn-sm btn-outline-secondary rounded-3" title="Modifier">
                             <i class="fa-solid fa-pen"></i>
                         </a>
                         {% if current_user.role in ['Administrateur', 'Directeur'] %}
