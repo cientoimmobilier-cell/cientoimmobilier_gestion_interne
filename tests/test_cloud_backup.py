@@ -20,6 +20,7 @@ from app.routes.cloud_backup import _redirect_uri
 
 class TestConfig(Config):
     TESTING = True
+    SECRET_KEY = 'cle-de-test-ciento-immobilier-2026-32caracteres'
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False
 

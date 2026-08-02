@@ -6,11 +6,15 @@ load_dotenv(os.path.join(basedir, '.env'))
 
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(32).hex()
+    SECRET_KEY = os.environ.get('SECRET_KEY', '')
 
-    if len(SECRET_KEY) < 32:
-        import warnings
-        warnings.warn('SECRET_KEY trop court ! Utilisez au moins 32 caractères.', stacklevel=2)
+    if not SECRET_KEY or len(SECRET_KEY) < 32:
+        raise RuntimeError(
+            'SECRET_KEY manquante ou trop courte : définissez la variable '
+            'd\'environnement SECRET_KEY (au moins 32 caractères). '
+            'Aucune génération automatique : celle-ci invalidait les sessions '
+            'à chaque redémarrage. Génération : '
+            'python -c "import secrets; print(secrets.token_hex(32))"')
 
     db_user = os.environ.get('DB_USER', 'postgres')
     db_password = os.environ.get('DB_PASSWORD', 'postgres')
