@@ -76,6 +76,10 @@ start_ciento.*
 diagnose_*.py
 test_*_insertion.py
 
+# ── Archives de sauvegarde locales (données sensibles, ne jamais versionner) ─
+backups/
+*.zip.ciento
+
 # ── Uploads utilisateur (données métier, ne pas versionner) ─────────────────
 app/static/uploads/*
 !app/static/uploads/.gitkeep
