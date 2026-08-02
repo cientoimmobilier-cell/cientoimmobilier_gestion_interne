@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash,
 from flask_login import login_required, current_user
 from app.models import BienAirbnb, ReservationAirbnb, Proprietaire, Utilisateur
 from app.utils.helpers import log_activity, sanitize_search, role_required
+from app.utils.security import sanitize_external_url
 from app.services.pdf_service import generate_airbnb_sheet_pdf
 from sqlalchemy.orm import joinedload
 from sqlalchemy import select, func as sa_func
@@ -91,7 +92,7 @@ def add_bien():
             frais_menage=request.form.get('frais_menage') or 0,
             proprietaire_id=request.form.get('proprietaire_id') or None,
             agent_id=request.form.get('agent_id') or None,
-            lien_airbnb=request.form.get('lien_airbnb'),
+            lien_airbnb=sanitize_external_url(request.form.get('lien_airbnb')),
             wifi='wifi' in request.form,
             parking='parking' in request.form,
             climatisation='climatisation' in request.form,
@@ -140,7 +141,7 @@ def edit_bien(bien_id):
         bien.proprietaire_id = request.form.get('proprietaire_id') or None
         bien.agent_id = request.form.get('agent_id') or None
         bien.statut = request.form.get('statut')
-        bien.lien_airbnb = request.form.get('lien_airbnb')
+        bien.lien_airbnb = sanitize_external_url(request.form.get('lien_airbnb'))
         bien.wifi = 'wifi' in request.form
         bien.parking = 'parking' in request.form
         bien.climatisation = 'climatisation' in request.form
@@ -300,7 +301,7 @@ def delete_reservation(reservation_id):
     
     return redirect(url_for('airbnb.view_bien', bien_id=bien_id))
 
-@airbnb.route('/telecharger-pdf/<int:bien_id>')
+@airbnb.route('/telecharger-pdf/<int:bien_id>', methods=['POST'])
 @login_required
 def download_airbnb_pdf(bien_id):
     try:

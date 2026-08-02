@@ -268,7 +268,7 @@ def upload_photos(property_id):
         try:
             safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
                 file_storage=file,
-                upload_subdir='uploads/photos',
+                upload_subdir='photos',
                 allowed_extensions=ALLOWED_IMAGES,
                 max_size=max_size,
                 category='image',
@@ -392,7 +392,7 @@ def upload_document(property_id):
     try:
         safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
             file_storage=file,
-            upload_subdir='uploads/documents',
+            upload_subdir='documents',
             allowed_extensions=ALLOWED_DOCUMENTS,
             max_size=max_size,
             category='document',
@@ -498,7 +498,7 @@ def add_visit(property_id):
         
     return redirect(url_for('properties.view_property', property_id=property_id))
 
-@properties.route('/exporter')
+@properties.route('/exporter', methods=['POST'])
 @login_required
 def export_properties():
     try:

@@ -39,7 +39,7 @@
                     <td>
                         <div class="d-flex align-items-center">
                             <div class="bg-light text-dark rounded-circle d-flex align-items-center justify-content-center fw-bold me-3" style="width: 40px; height: 40px;">
-                                {{ user.prenom[0]|upper }}{{ user.nom[0]|upper }}
+                                {{ (user.prenom[:1] or '?')|upper }}{{ (user.nom[:1] or '?')|upper }}
                             </div>
                             <div>
                                 <div class="fw-bold">{{ user.prenom }} {{ user.nom }}</div>
@@ -105,7 +105,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="new_password_{{ user.id }}" class="form-label fw-semibold">Mot de passe</label>
-                        <input type="text" class="form-control" id="new_password_{{ user.id }}" name="new_password" required placeholder="Saisir le nouveau mot de passe">
+                        <input type="password" class="form-control" id="new_password_{{ user.id }}" name="new_password" required placeholder="Saisir le nouveau mot de passe">
                     </div>
                 </div>
                 <div class="modal-footer border-top-0 pt-0">

@@ -131,42 +131,51 @@ def secure_save_path(upload_dir, original_filename, prefix=''):
     return abs_path, unique_name
 
 # --- ClamAV integration (optionnel) ---
-_clamav_available = None
+# Mode de connexion détecté : 'unix', 'network' ou None (indisponible).
+_clamav_mode = None
 
 def is_clamav_available():
-    global _clamav_available
-    if _clamav_available is not None:
-        return _clamav_available
+    global _clamav_mode
+    if _clamav_mode is not None:
+        return _clamav_mode != 'unavailable'
     try:
         import pyclamd
-        try:
-            cd = pyclamd.ClamdUnixSocket()
-            cd.ping()
-            _clamav_available = True
-            logger.info("[UPLOAD] ClamAV détecté (socket Unix)")
-            return True
-        except Exception:
-            try:
-                cd = pyclamd.ClamdNetworkSocket()
-                cd.ping()
-                _clamav_available = True
-                logger.info("[UPLOAD] ClamAV détecté (socket réseau)")
-                return True
-            except Exception:
-                _clamav_available = False
-                logger.warning("[UPLOAD] ClamAV non disponible — upload sans scan antivirus")
-                return False
     except ImportError:
-        _clamav_available = False
+        _clamav_mode = 'unavailable'
         logger.warning("[UPLOAD] pyclamd non installé — upload sans scan antivirus")
         return False
+
+    # Sur Windows, le socket Unix n'existe pas : le démon ClamAV écoute
+    # généralement en TCP sur 127.0.0.1:3310.
+    if os.name == 'nt':
+        factories = [pyclamd.ClamdNetworkSocket, pyclamd.ClamdUnixSocket]
+    else:
+        factories = [pyclamd.ClamdUnixSocket, pyclamd.ClamdNetworkSocket]
+
+    for factory in factories:
+        try:
+            cd = factory()
+            cd.ping()
+            _clamav_mode = 'network' if factory is pyclamd.ClamdNetworkSocket else 'unix'
+            logger.info("[UPLOAD] ClamAV détecté (socket %s)", _clamav_mode)
+            return True
+        except Exception:
+            continue
+    _clamav_mode = 'unavailable'
+    logger.warning("[UPLOAD] ClamAV non disponible — upload sans scan antivirus")
+    return False
+
+def _clamd_connection():
+    import pyclamd
+    if _clamav_mode == 'network':
+        return pyclamd.ClamdNetworkSocket()
+    return pyclamd.ClamdUnixSocket()
 
 def scan_with_clamav(filepath):
     if not is_clamav_available():
         return True, None
     try:
-        import pyclamd
-        cd = pyclamd.ClamdUnixSocket() if pyclamd.ClamdUnixSocket else pyclamd.ClamdNetworkSocket()
+        cd = _clamd_connection()
         result = cd.scan_file(filepath)
         if result:
             for path, status in result.items():
@@ -263,7 +272,11 @@ def validate_and_save_upload(
             'VIRUS_DETECTED'
         )
 
-    rel_path = f"{upload_subdir}/{unique_name}".replace('\\', '/')
+    # Le chemin stocké en base porte le préfixe "uploads/" pour que l'URL
+    # /static/uploads/... (static_folder = app/static) corresponde à l'emplacement
+    # réel (UPLOAD_FOLDER + upload_subdir). upload_subdir est relatif à
+    # UPLOAD_FOLDER (ex. 'photos', 'documents').
+    rel_path = f"uploads/{upload_subdir}/{unique_name}".replace('\\', '/')
 
     log_upload(user_id, original_name, file_size, category, 'ACCEPTÉ', f'saved_as={unique_name}')
 

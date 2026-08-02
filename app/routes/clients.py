@@ -373,7 +373,7 @@ def verifier_doublon_client():
         return jsonify({'doublon': False, 'error': 'Erreur interne'}), 500
 
 
-@clients.route('/exporter')
+@clients.route('/exporter', methods=['POST'])
 @login_required
 @role_required('Agent immobilier', 'Assistant')
 def export_clients():

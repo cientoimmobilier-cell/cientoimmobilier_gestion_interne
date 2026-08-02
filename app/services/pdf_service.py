@@ -7,6 +7,11 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
+def esc(value):
+    """Échappe les caractères interprétés comme balises par ReportLab."""
+    return str(value if value is not None else '').replace('&', '&amp;') \
+        .replace('<', '&lt;').replace('>', '&gt;')
+
 def format_currency_pdf(amount, currency):
     try:
         formatted = '{:,.2f}'.format(float(amount)).replace(',', ' ')
@@ -99,7 +104,7 @@ def generate_transaction_sheet_pdf(transaction):
     <i>La Solution en Service Immobilier</i><br/>
     Entreprise Immobilière<br/>
     Date : {datetime.now().strftime('%d/%m/%Y à %H:%M')}<br/>
-    Réf : {transaction.reference_transaction}
+    Réf : {esc(transaction.reference_transaction)}
     """
     
     header_data.append([logo_cell, Paragraph(info_text, normal_style)])
@@ -124,7 +129,7 @@ def generate_transaction_sheet_pdf(transaction):
     
     # Document Title
     story.append(Paragraph(f"FICHE DE TRANSACTION OFFICIELLE", title_style))
-    story.append(Paragraph(f"Cette fiche récapitule les détails administratifs, financiers et légaux de la transaction commerciale <b>{transaction.reference_transaction}</b>.", normal_style))
+    story.append(Paragraph(f"Cette fiche récapitule les détails administratifs, financiers et légaux de la transaction commerciale <b>{esc(transaction.reference_transaction)}</b>.", normal_style))
     story.append(Spacer(1, 10))
     
     # General Info Table
@@ -134,11 +139,11 @@ def generate_transaction_sheet_pdf(transaction):
     currency = transaction.devise or 'EUR'
     
     summary_data = [
-        [Paragraph("Référence Transaction :", bold_style), Paragraph(transaction.reference_transaction, normal_style)],
-        [Paragraph("Type de Transaction :", bold_style), Paragraph(transaction.type_transaction, normal_style)],
+        [Paragraph("Référence Transaction :", bold_style), Paragraph(esc(transaction.reference_transaction), normal_style)],
+        [Paragraph("Type de Transaction :", bold_style), Paragraph(esc(transaction.type_transaction), normal_style)],
         [Paragraph("Montant de l'opération :", bold_style), Paragraph(format_currency_pdf(transaction.montant, currency), bold_style)],
         [Paragraph("Date de la transaction :", bold_style), Paragraph(transaction.date_transaction.strftime('%d/%m/%Y'), normal_style)],
-        [Paragraph("Statut actuel :", bold_style), Paragraph(transaction.statut, normal_style)]
+        [Paragraph("Statut actuel :", bold_style), Paragraph(esc(transaction.statut), normal_style)]
     ]
     
     summary_table = Table(summary_data, colWidths=[180, 350])
@@ -164,9 +169,9 @@ def generate_transaction_sheet_pdf(transaction):
     agent_role = f"Rôle : {transaction.agent.role}" if transaction.agent else ""
     
     parties_data = [
-        [Paragraph("Propriétaire / Vendeur :", bold_style), Paragraph(f"<b>{owner_name}</b><br/>{owner_contact}", normal_style)],
-        [Paragraph("Client Acquéreur / Locataire :", bold_style), Paragraph(f"<b>{client_name}</b><br/>{client_contact}", normal_style)],
-        [Paragraph("Agent responsable :", bold_style), Paragraph(f"<b>{agent_name}</b><br/>{agent_role}", normal_style)]
+        [Paragraph("Propriétaire / Vendeur :", bold_style), Paragraph(f"<b>{esc(owner_name)}</b><br/>{esc(owner_contact)}", normal_style)],
+        [Paragraph("Client Acquéreur / Locataire :", bold_style), Paragraph(f"<b>{esc(client_name)}</b><br/>{esc(client_contact)}", normal_style)],
+        [Paragraph("Agent responsable :", bold_style), Paragraph(f"<b>{esc(agent_name)}</b><br/>{esc(agent_role)}", normal_style)]
     ]
     
     parties_table = Table(parties_data, colWidths=[180, 350])
@@ -182,10 +187,10 @@ def generate_transaction_sheet_pdf(transaction):
     story.append(Paragraph("3. Description du bien immobilier", section_style))
     
     prop = transaction.propriete
-    prop_details = f"<b>{prop.titre}</b><br/>Adresse : {prop.adresse}, {prop.ville}<br/>Type : {prop.type_bien} | Superficie : {prop.superficie or '--'} m²" if prop else "N/A"
-    
+    prop_details = f"<b>{esc(prop.titre)}</b><br/>Adresse : {esc(prop.adresse)}, {esc(prop.ville)}<br/>Type : {esc(prop.type_bien)} | Superficie : {esc(prop.superficie or '--')} m²" if prop else "N/A"
+
     prop_data = [
-        [Paragraph("Référence du bien :", bold_style), Paragraph(prop.reference_bien if prop else "N/A", normal_style)],
+        [Paragraph("Référence du bien :", bold_style), Paragraph(esc(prop.reference_bien) if prop else "N/A", normal_style)],
         [Paragraph("Détails physiques :", bold_style), Paragraph(prop_details, normal_style)]
     ]
     
@@ -285,7 +290,7 @@ def generate_payment_receipt_pdf(payment):
     <i>La Solution en Service Immobilier</i><br/>
     Entreprise Immobilière<br/>
     Date : {datetime.now().strftime('%d/%m/%Y à %H:%M')}<br/>
-    Réf Paiement : {payment.reference_paiement or f"PAY-{payment.id:05d}"}
+    Réf Paiement : {esc(payment.reference_paiement or f"PAY-{payment.id:05d}")}
     """
     
     header_data.append([logo_cell, Paragraph(info_text, normal_style)])
@@ -315,17 +320,17 @@ def generate_payment_receipt_pdf(payment):
     client_name = f"{payment.transaction.client.prenom} {payment.transaction.client.nom}" if payment.transaction and payment.transaction.client else "N/A"
     
     # Receipt details
-    receipt_text = f"""Le bureau de transaction de Ciento Immobilier certifie par la présente avoir reçu du client <b>{client_name}</b>, le règlement décrit ci-dessous au titre de la transaction <b>{payment.transaction.reference_transaction}</b>.
+    receipt_text = f"""Le bureau de transaction de Ciento Immobilier certifie par la présente avoir reçu du client <b>{esc(client_name)}</b>, le règlement décrit ci-dessous au titre de la transaction <b>{esc(payment.transaction.reference_transaction)}</b>.
     """
     story.append(Paragraph(receipt_text, normal_style))
     story.append(Spacer(1, 15))
     
     receipt_data = [
-        [Paragraph("Référence Paiement :", bold_style), Paragraph(payment.reference_paiement or f"PAY-{payment.id:05d}", normal_style)],
+        [Paragraph("Référence Paiement :", bold_style), Paragraph(esc(payment.reference_paiement or f"PAY-{payment.id:05d}"), normal_style)],
         [Paragraph("Date du Règlement :", bold_style), Paragraph(payment.date_paiement.strftime('%d/%m/%Y'), normal_style)],
-        [Paragraph("Mode de Paiement :", bold_style), Paragraph(payment.mode_paiement, normal_style)],
+        [Paragraph("Mode de Paiement :", bold_style), Paragraph(esc(payment.mode_paiement), normal_style)],
         [Paragraph("Montant Encaissé :", bold_style), Paragraph(format_currency_pdf(payment.montant, currency), bold_style)],
-        [Paragraph("Statut du Règlement :", bold_style), Paragraph(payment.statut, bold_style)]
+        [Paragraph("Statut du Règlement :", bold_style), Paragraph(esc(payment.statut), bold_style)]
     ]
     
     receipt_table = Table(receipt_data, colWidths=[180, 340])
@@ -341,7 +346,7 @@ def generate_payment_receipt_pdf(payment):
     # Reference property info
     prop = payment.transaction.propriete if payment.transaction else None
     if prop:
-        prop_text = f"<b>Objet de la transaction :</b> {prop.type_bien} réf. <b>{prop.reference_bien}</b> situé à {prop.ville} ({prop.quartier or ''})."
+        prop_text = f"<b>Objet de la transaction :</b> {esc(prop.type_bien)} réf. <b>{esc(prop.reference_bien)}</b> situé à {esc(prop.ville)} ({esc(prop.quartier or '')})."
         story.append(Paragraph(prop_text, normal_style))
         
     story.append(Spacer(1, 35))
@@ -444,7 +449,7 @@ def generate_airbnb_sheet_pdf(bien):
     <i>La Solution en Service Immobilier</i><br/>
     Entreprise Immobilière — Service Gestion AirBNB<br/>
     Date : {datetime.now().strftime('%d/%m/%Y à %H:%M')}<br/>
-    Réf : {bien.reference}
+    Réf : {esc(bien.reference)}
     """
     
     header_data.append([logo_cell, Paragraph(info_text, normal_style)])
@@ -469,19 +474,19 @@ def generate_airbnb_sheet_pdf(bien):
     
     # Document Title
     story.append(Paragraph(f"FICHE DE BIEN AIRBNB", title_style))
-    story.append(Paragraph(f"Cette fiche récapitule les détails du bien <b>{bien.titre}</b>.", normal_style))
+    story.append(Paragraph(f"Cette fiche récapitule les détails du bien <b>{esc(bien.titre)}</b>.", normal_style))
     story.append(Spacer(1, 10))
     
     # General Info Table
     story.append(Paragraph("1. Informations générales", section_style))
     
     summary_data = [
-        [Paragraph("Référence :", bold_style), Paragraph(bien.reference, normal_style)],
-        [Paragraph("Type de bien :", bold_style), Paragraph(bien.type_bien, normal_style)],
-        [Paragraph("Adresse :", bold_style), Paragraph(f"{bien.adresse}, {bien.ville}", normal_style)],
-        [Paragraph("Capacité :", bold_style), Paragraph(f"{bien.capacite} voyageurs", normal_style)],
+        [Paragraph("Référence :", bold_style), Paragraph(esc(bien.reference), normal_style)],
+        [Paragraph("Type de bien :", bold_style), Paragraph(esc(bien.type_bien), normal_style)],
+        [Paragraph("Adresse :", bold_style), Paragraph(f"{esc(bien.adresse)}, {esc(bien.ville)}", normal_style)],
+        [Paragraph("Capacité :", bold_style), Paragraph(f"{esc(bien.capacite)} voyageurs", normal_style)],
         [Paragraph("Prix par nuit :", bold_style), Paragraph(format_currency_pdf(bien.prix_par_nuit, bien.devise), bold_style)],
-        [Paragraph("Statut actuel :", bold_style), Paragraph(bien.statut, normal_style)]
+        [Paragraph("Statut actuel :", bold_style), Paragraph(esc(bien.statut), normal_style)]
     ]
     
     summary_table = Table(summary_data, colWidths=[180, 350])
@@ -503,8 +508,8 @@ def generate_airbnb_sheet_pdf(bien):
     agent_name = f"{bien.agent_gestionnaire.prenom} {bien.agent_gestionnaire.nom}" if bien.agent_gestionnaire else "N/A"
     
     parties_data = [
-        [Paragraph("Propriétaire :", bold_style), Paragraph(f"<b>{owner_name}</b><br/>{owner_contact}", normal_style)],
-        [Paragraph("Agent Gestionnaire :", bold_style), Paragraph(f"<b>{agent_name}</b>", normal_style)]
+        [Paragraph("Propriétaire :", bold_style), Paragraph(f"<b>{esc(owner_name)}</b><br/>{esc(owner_contact)}", normal_style)],
+        [Paragraph("Agent Gestionnaire :", bold_style), Paragraph(f"<b>{esc(agent_name)}</b>", normal_style)]
     ]
     
     parties_table = Table(parties_data, colWidths=[180, 350])
@@ -573,7 +578,7 @@ def generate_occupation_fiche_pdf(occupation):
     <i>La Solution en Service Immobilier</i><br/>
     Module Occupation<br/>
     Date : {dt.now().strftime('%d/%m/%Y \u00e0 %H:%M')}<br/>
-    R\u00e9f : {occupation.numero_occupation}
+    R\u00e9f : {esc(occupation.numero_occupation)}
     """
     header_data.append([logo_cell, Paragraph(info_text, normal_style)])
     header_table = Table(header_data, colWidths=[150, 380])
@@ -595,7 +600,7 @@ def generate_occupation_fiche_pdf(occupation):
 
     story.append(Paragraph("FICHE D'OCCUPATION", title_style))
     story.append(Paragraph(
-        f'Cette fiche r\u00e9capitule les d\u00e9tails de l\'occupation <b>{occupation.numero_occupation}</b>.',
+        f'Cette fiche r\u00e9capitule les d\u00e9tails de l\'occupation <b>{esc(occupation.numero_occupation)}</b>.',
         normal_style
     ))
     story.append(Spacer(1, 10))
@@ -603,8 +608,8 @@ def generate_occupation_fiche_pdf(occupation):
     # 1. Informations g\u00e9n\u00e9rales
     story.append(Paragraph('1. Informations g\u00e9n\u00e9rales', section_style))
     summary_data = [
-        [Paragraph('N\u00b0 Occupation :', bold_style), Paragraph(occupation.numero_occupation, normal_style)],
-        [Paragraph('Statut :', bold_style), Paragraph(occupation.statut, normal_style)],
+        [Paragraph('N\u00b0 Occupation :', bold_style), Paragraph(esc(occupation.numero_occupation), normal_style)],
+        [Paragraph('Statut :', bold_style), Paragraph(esc(occupation.statut), normal_style)],
         [Paragraph("Date d'entr\u00e9e :", bold_style),
          Paragraph(occupation.date_entree.strftime('%d/%m/%Y') if occupation.date_entree else '--', normal_style)],
         [Paragraph('Date sortie pr\u00e9vue :', bold_style),
@@ -636,9 +641,9 @@ def generate_occupation_fiche_pdf(occupation):
         owner_contact = f'T\u00e9l: {o.telephone or "N/A"} | Email: {o.email or "N/A"}'
 
     parties_data = [
-        [Paragraph('Locataire :', bold_style), Paragraph(f'<b>{client_name}</b><br/>{client_contact}', normal_style)],
-        [Paragraph('Propri\u00e9taire :', bold_style), Paragraph(f'<b>{owner_name}</b><br/>{owner_contact}', normal_style)],
-        [Paragraph('Agent responsable :', bold_style), Paragraph(f'<b>{agent_name}</b>', normal_style)],
+        [Paragraph('Locataire :', bold_style), Paragraph(f'<b>{esc(client_name)}</b><br/>{esc(client_contact)}', normal_style)],
+        [Paragraph('Propri\u00e9taire :', bold_style), Paragraph(f'<b>{esc(owner_name)}</b><br/>{esc(owner_contact)}', normal_style)],
+        [Paragraph('Agent responsable :', bold_style), Paragraph(f'<b>{esc(agent_name)}</b>', normal_style)],
     ]
     parties_table = Table(parties_data, colWidths=[180, 350])
     parties_table.setStyle(TableStyle([
@@ -652,7 +657,7 @@ def generate_occupation_fiche_pdf(occupation):
     # 3. Bien
     story.append(Paragraph('3. Bien immobilier', section_style))
     p = occupation.propriete
-    bien_text = f'{p.titre}<br/>{p.adresse}, {p.ville}<br/>Type: {p.type_bien} | R\u00e9f: {p.reference_bien}' if p else 'N/A'
+    bien_text = f'{esc(p.titre)}<br/>{esc(p.adresse)}, {esc(p.ville)}<br/>Type: {esc(p.type_bien)} | R\u00e9f: {esc(p.reference_bien)}' if p else 'N/A'
     bien_data = [
         [Paragraph('Bien :', bold_style), Paragraph(bien_text, normal_style)],
     ]
@@ -670,13 +675,13 @@ def generate_occupation_fiche_pdf(occupation):
     c = occupation.contrat
     if c:
         contrat_data = [
-            [Paragraph('N\u00b0 Contrat :', bold_style), Paragraph(c.numero_contrat, normal_style)],
+            [Paragraph('N\u00b0 Contrat :', bold_style), Paragraph(esc(c.numero_contrat), normal_style)],
             [Paragraph('Date signature :', bold_style),
              Paragraph(c.date_signature.strftime('%d/%m/%Y') if c.date_signature else '--', normal_style)],
             [Paragraph('Loyer :', bold_style), Paragraph(format_currency_pdf(c.montant_loyer, 'EUR') if c.montant_loyer else '--', bold_style)],
             [Paragraph('D\u00e9p\u00f4t garantie :', bold_style), Paragraph(format_currency_pdf(c.depot_garantie, 'EUR') if c.depot_garantie else '--', normal_style)],
-            [Paragraph('Mode de paiement :', bold_style), Paragraph(c.mode_paiement or '--', normal_style)],
-            [Paragraph('Fr\u00e9quence :', bold_style), Paragraph(c.frequence or '--', normal_style)],
+            [Paragraph('Mode de paiement :', bold_style), Paragraph(esc(c.mode_paiement or '--'), normal_style)],
+            [Paragraph('Fr\u00e9quence :', bold_style), Paragraph(esc(c.frequence or '--'), normal_style)],
         ]
         contrat_table = Table(contrat_data, colWidths=[180, 350])
         contrat_table.setStyle(TableStyle([
@@ -698,10 +703,10 @@ def generate_occupation_fiche_pdf(occupation):
                      Paragraph('Lien', bold_style), Paragraph('T\u00e9l', bold_style)]]
         for o in occupants:
             occ_data.append([
-                Paragraph(o.nom or '', normal_style),
-                Paragraph(o.prenom or '', normal_style),
-                Paragraph(o.lien_locataire or '', normal_style),
-                Paragraph(o.telephone or '', normal_style),
+                Paragraph(esc(o.nom or ''), normal_style),
+                Paragraph(esc(o.prenom or ''), normal_style),
+                Paragraph(esc(o.lien_locataire or ''), normal_style),
+                Paragraph(esc(o.telephone or ''), normal_style),
             ])
         occ_table = Table(occ_data, colWidths=[120, 120, 120, 170])
         occ_table.setStyle(TableStyle([

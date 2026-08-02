@@ -153,7 +153,7 @@ def import_contract_pdf():
         try:
             safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
                 file_storage=file,
-                upload_subdir='uploads/documents',
+                upload_subdir='documents',
                 allowed_extensions=ALLOWED_PDFS,
                 max_size=max_size,
                 category='pdf',
@@ -822,7 +822,7 @@ def upload_document(occ_id):
     try:
         safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
             file_storage=file,
-            upload_subdir='uploads/documents',
+            upload_subdir='documents',
             allowed_extensions=ALLOWED_DOCUMENTS | ALLOWED_IMAGES,
             max_size=max_size,
             category='document',
@@ -891,7 +891,7 @@ def delete_document(occ_id, doc_id):
 
 # ── Exports ───────────────────────────────────────────────────────────
 
-@occupation.route('/exporter')
+@occupation.route('/exporter', methods=['POST'])
 @login_required
 def export_excel():
     try:
@@ -915,7 +915,7 @@ def export_excel():
         return redirect(url_for('occupation.list_occupations'))
 
 
-@occupation.route('/<int:occ_id>/pdf')
+@occupation.route('/<int:occ_id>/pdf', methods=['POST'])
 @login_required
 def export_pdf(occ_id):
     occ = _get_occupation_or_404(occ_id)

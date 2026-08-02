@@ -1,4 +1,5 @@
 """Tests du module Sauvegarde Cloud Google Drive (AES-256, exports, backup/restore)."""
+import base64
 import os
 import shutil
 import tempfile
@@ -338,6 +339,26 @@ class CloudBackupTestCase(unittest.TestCase):
         self.assertIn('new_id', drive.store)
         self.assertNotIn('old_id', drive.store)
 
+    # ── B11 : verrou d'exécution partagé backup/restore ─────────────────────
+    def test_restore_blocked_while_backup_running(self):
+        from app.services.google_drive_service import GoogleDriveError
+        service = backup_service.BackupService(self.app)
+        service._execution_lock.acquire()
+        try:
+            with self.assertRaises(GoogleDriveError):
+                service.restore_backup(9999, PASSPHRASE)
+        finally:
+            service._execution_lock.release()
+
+    def test_restore_releases_lock_after_failure(self):
+        from app.services.google_drive_service import GoogleDriveError
+        service = backup_service.BackupService(self.app)
+        # Fichier introuvable → échec avant même de lever le verrou, qui doit
+        # néanmoins être libéré pour les opérations suivantes.
+        with self.assertRaises(GoogleDriveError):
+            service.restore_backup(424242, PASSPHRASE)
+        self.assertFalse(service._execution_lock.locked())
+
     # ── Routes ───────────────────────────────────────────────────────────────
     def test_index_page_requires_admin(self):
         self._login_admin()
@@ -364,6 +385,77 @@ class CloudBackupTestCase(unittest.TestCase):
                                     data={'backup_type': 'Manual'},
                                     follow_redirects=True)
         self.assertIn(b'Connectez d', response.data)
+
+    # ── B7 : changement de phrase de passe ───────────────────────────────────
+    def test_set_passphrase_first_time(self):
+        self._login_admin()
+        response = self.client.post(
+            '/parametres/sauvegarde-cloud/cle',
+            data={'passphrase': 'nouvelle-phrase-098',
+                  'confirmation': 'nouvelle-phrase-098'},
+            follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        setting = CloudBackupSetting.get()
+        self.assertEqual(
+            crypto_service.unwrap_secret(setting.encryption_passphrase_wrapped),
+            'nouvelle-phrase-098')
+
+    def test_change_passphrase_requires_old(self):
+        self._enable_setting()
+        self._login_admin()
+        response = self.client.post(
+            '/parametres/sauvegarde-cloud/cle',
+            data={'passphrase': 'nouvelle-phrase-098',
+                  'confirmation': 'nouvelle-phrase-098'},
+            follow_redirects=True)
+        self.assertIn(b'ancienne phrase de passe', response.data)
+        setting = CloudBackupSetting.get()
+        self.assertEqual(
+            crypto_service.unwrap_secret(setting.encryption_passphrase_wrapped),
+            PASSPHRASE)
+
+    def test_change_passphrase_rejects_wrong_old(self):
+        self._enable_setting()
+        self._login_admin()
+        response = self.client.post(
+            '/parametres/sauvegarde-cloud/cle',
+            data={'old_passphrase': 'mauvaise-ancienne-xxx',
+                  'passphrase': 'nouvelle-phrase-098',
+                  'confirmation': 'nouvelle-phrase-098'},
+            follow_redirects=True)
+        self.assertIn(b'incorrecte', response.data)
+        setting = CloudBackupSetting.get()
+        self.assertEqual(
+            crypto_service.unwrap_secret(setting.encryption_passphrase_wrapped),
+            PASSPHRASE)
+
+    def test_change_passphrase_with_correct_old(self):
+        self._enable_setting()
+        self._login_admin()
+        response = self.client.post(
+            '/parametres/sauvegarde-cloud/cle',
+            data={'old_passphrase': PASSPHRASE,
+                  'passphrase': 'nouvelle-phrase-098',
+                  'confirmation': 'nouvelle-phrase-098'},
+            follow_redirects=True)
+        self.assertEqual(response.status_code, 200)
+        setting = CloudBackupSetting.get()
+        self.assertEqual(
+            crypto_service.unwrap_secret(setting.encryption_passphrase_wrapped),
+            'nouvelle-phrase-098')
+
+    # ── V4 : PKCE ────────────────────────────────────────────────────────────
+    def test_pkce_pair_generation(self):
+        from app.services.google_drive_service import GoogleDriveService
+        import hashlib
+        verifier, challenge = GoogleDriveService._pkce_pair()
+        self.assertTrue(verifier)
+        self.assertTrue(challenge)
+        self.assertNotIn('=', challenge)
+        expected = base64.urlsafe_b64encode(
+            hashlib.sha256(verifier.encode('ascii')).digest()).rstrip(b'=').decode()
+        self.assertEqual(challenge, expected)
+        self.assertNotEqual(GoogleDriveService._pkce_pair()[0], verifier)
 
     def test_backups_page(self):
         self._login_admin()
@@ -420,7 +512,8 @@ class CloudBackupTestCase(unittest.TestCase):
                 return True
 
             def authorization_url(self, redirect_uri):
-                return ('https://accounts.google.com/o/oauth2/auth?x=1', 'state-xyz')
+                return ('https://accounts.google.com/o/oauth2/auth?x=1',
+                        'state-xyz', 'pkce-verifier-abc')
 
         original = cb.GoogleDriveService
         cb.GoogleDriveService = FakeOAuth
@@ -433,6 +526,7 @@ class CloudBackupTestCase(unittest.TestCase):
                     'https://accounts.google.com/o/oauth2/auth'))
             with self.client.session_transaction() as sess:
                 self.assertEqual(sess['cloud_oauth_state'], 'state-xyz')
+                self.assertEqual(sess['cloud_oauth_verifier'], 'pkce-verifier-abc')
         finally:
             cb.GoogleDriveService = original
 
@@ -451,8 +545,8 @@ class CloudBackupTestCase(unittest.TestCase):
             def is_configured(self):
                 return False
 
-            def exchange_code(self, code, redirect_uri):
-                self.exchanged.append((code, redirect_uri))
+            def exchange_code(self, code, redirect_uri, code_verifier=None):
+                self.exchanged.append((code, redirect_uri, code_verifier))
 
         original = cb.GoogleDriveService
         cb.GoogleDriveService = FakeOAuth
@@ -460,6 +554,7 @@ class CloudBackupTestCase(unittest.TestCase):
             self._login_admin()
             with self.client.session_transaction() as sess:
                 sess['cloud_oauth_state'] = 'state-xyz'
+                sess['cloud_oauth_verifier'] = 'pkce-verifier-abc'
             resp = self.client.get(
                 '/parametres/sauvegarde-cloud/callback',
                 query_string={'state': 'state-xyz', 'code': 'auth-code-123'})
@@ -468,6 +563,7 @@ class CloudBackupTestCase(unittest.TestCase):
             self.assertEqual(FakeOAuth.exchanged[0][0], 'auth-code-123')
             self.assertIn('/parametres/sauvegarde-cloud/callback',
                           FakeOAuth.exchanged[0][1])
+            self.assertEqual(FakeOAuth.exchanged[0][2], 'pkce-verifier-abc')
         finally:
             cb.GoogleDriveService = original
 
@@ -486,8 +582,8 @@ class CloudBackupTestCase(unittest.TestCase):
             def is_configured(self):
                 return False
 
-            def exchange_code(self, code, redirect_uri):
-                self.exchanged.append((code, redirect_uri))
+            def exchange_code(self, code, redirect_uri, code_verifier=None):
+                self.exchanged.append((code, redirect_uri, code_verifier))
 
         original = cb.GoogleDriveService
         cb.GoogleDriveService = FakeOAuth
@@ -510,6 +606,7 @@ class CloudBackupTestCase(unittest.TestCase):
 
         class FakeOAuth:
             cleared = []
+            revoked = []
 
             def __init__(self, setting=None):
                 pass
@@ -519,6 +616,9 @@ class CloudBackupTestCase(unittest.TestCase):
 
             def is_configured(self):
                 return False
+
+            def revoke_refresh_token(self):
+                self.revoked.append(True)
 
             def clear_credentials(self):
                 self.cleared.append(True)
@@ -532,8 +632,55 @@ class CloudBackupTestCase(unittest.TestCase):
                 follow_redirects=True)
             self.assertEqual(resp.status_code, 200)
             self.assertTrue(FakeOAuth.cleared)
+            self.assertTrue(FakeOAuth.revoked)
         finally:
             cb.GoogleDriveService = original
+
+
+class TestRestoreSqlValidation(unittest.TestCase):
+    """Garde-fou : le script SQL de restauration doit être conforme à l'export."""
+
+    def test_accepts_legitimate_export(self):
+        from app.services.backup_service import _validate_restore_sql
+        legit = (
+            '-- CIENTO IMMOBILIER — Sauvegarde de la base de données\n'
+            'BEGIN;\n'
+            'DROP TABLE IF EXISTS "contrats" CASCADE;\n'
+            'CREATE TABLE "contrats" (id INTEGER PRIMARY KEY, '
+            'numero_contrat VARCHAR(50) NOT NULL, '
+            'transaction_id INTEGER, FOREIGN KEY(transaction_id) '
+            'REFERENCES "transactions" (id) ON DELETE CASCADE);\n'
+            "INSERT INTO \"contrats\" (id, numero_contrat) VALUES (1, 'C-001');\n"
+            "SELECT setval(pg_get_serial_sequence('contrats', 'id'), 1);\n"
+            'COMMIT;'
+        )
+        _validate_restore_sql(legit)
+
+    def test_rejects_copy_to(self):
+        from app.services.backup_service import _validate_restore_sql
+        from app.services.google_drive_service import GoogleDriveError
+        with self.assertRaises(GoogleDriveError):
+            _validate_restore_sql("COPY contrats TO '/tmp/out.csv';")
+
+    def test_rejects_drop_database(self):
+        from app.services.backup_service import _validate_restore_sql
+        from app.services.google_drive_service import GoogleDriveError
+        with self.assertRaises(GoogleDriveError):
+            _validate_restore_sql('DROP DATABASE ciento;')
+
+    def test_rejects_delete_from(self):
+        from app.services.backup_service import _validate_restore_sql
+        from app.services.google_drive_service import GoogleDriveError
+        with self.assertRaises(GoogleDriveError):
+            _validate_restore_sql('DELETE FROM "utilisateurs";')
+
+    def test_rejects_alter_and_grant(self):
+        from app.services.backup_service import _validate_restore_sql
+        from app.services.google_drive_service import GoogleDriveError
+        with self.assertRaises(GoogleDriveError):
+            _validate_restore_sql('ALTER SYSTEM SET listen_addresses;')
+        with self.assertRaises(GoogleDriveError):
+            _validate_restore_sql('GRANT ALL ON ALL TABLES TO public;')
 
 
 if __name__ == '__main__':

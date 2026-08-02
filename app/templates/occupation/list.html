@@ -15,9 +15,12 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h5 class="fw-bold text-dark mb-0">Liste des occupations</h5>
     <div class="d-flex gap-2">
-        <a href="{{ url_for('occupation.export_excel') }}" class="btn btn-outline-success rounded-3">
-            <i class="fa-solid fa-file-excel me-2"></i>Exporter
-        </a>
+        <form method="POST" action="{{ url_for('occupation.export_excel') }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-success rounded-3">
+                <i class="fa-solid fa-file-excel me-2"></i>Exporter
+            </button>
+        </form>
         {% if current_user.role in ['Administrateur', 'Directeur', 'Agent immobilier'] %}
         <a href="{{ url_for('occupation.create_occupation', next=request.full_path.rstrip('?')) }}" class="btn btn-accent rounded-3">
             <i class="fa-solid fa-plus me-2"></i>Nouvelle occupation

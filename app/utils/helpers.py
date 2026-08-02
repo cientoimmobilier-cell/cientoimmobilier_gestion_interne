@@ -19,6 +19,27 @@ def generate_random_password(length=12):
     return ''.join(secrets.choice(characters) for i in range(length))
 
 
+_DANGEROUS_FORMULA_PREFIX = ('=', '+', '-', '@', '\t', '\r')
+
+
+def neutralize_formula(value):
+    """Prévient l'injection de formules dans les exports Excel/CSV.
+
+    Préfixe d'une apostrophe les chaînes commençant par un caractère interprété
+    par Excel/LibreOffice comme une formule, sans altérer les nombres négatifs
+    légitimes (ex. -1500.50).
+    """
+    if not isinstance(value, str) or not value.startswith(_DANGEROUS_FORMULA_PREFIX):
+        return value
+    if value.startswith('-'):
+        try:
+            float(value)
+            return value
+        except ValueError:
+            pass
+    return "'" + value
+
+
 def sanitize_search(search_term):
     """
     Échappe les caractères spéciaux LIKE (%, _) dans un terme de recherche

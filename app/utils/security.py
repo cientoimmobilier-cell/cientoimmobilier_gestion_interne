@@ -1,6 +1,21 @@
 import secrets
+from urllib.parse import urlparse
 
 from flask import g
+
+
+def sanitize_external_url(value):
+    """Ne conserve que des URLs http(s) absolues ; renvoie '' sinon."""
+    if not value:
+        return ''
+    value = str(value).strip()
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return ''
+    if parsed.scheme.lower() not in ('http', 'https') or not parsed.netloc:
+        return ''
+    return value
 
 
 def generate_nonce():
@@ -15,24 +30,13 @@ def build_csp():
         'default-src': ["'self'"],
         'script-src': [
             "'self'",
-            "https://cdn.jsdelivr.net",
             f"'nonce-{nonce}'",
         ],
         'style-src': [
             "'self'",
-            "https://cdn.jsdelivr.net",
-            "https://cdnjs.cloudflare.com",
-            "https://fonts.googleapis.com",
             "'unsafe-inline'",
         ],
-        'font-src': [
-            "'self'",
-            "https://cdnjs.cloudflare.com",
-            "https://cdn.jsdelivr.net",
-            "https://fonts.googleapis.com",
-            "https://fonts.gstatic.com",
-            "data:",
-        ],
+        'font-src': ["'self'"],
         'img-src': [
             "'self'",
             "data:",

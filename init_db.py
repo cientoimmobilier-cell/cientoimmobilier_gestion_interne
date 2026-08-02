@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from app import create_app, db
 from app.models import Utilisateur, Caracteristique
+from app.utils.helpers import generate_random_password
 
 
 app = create_app()
@@ -41,7 +42,7 @@ def init_database():
                 role='Administrateur',
                 actif=True
             )
-            default_pass = 'AdminCiento123!'
+            default_pass = generate_random_password(16)
             admin.set_password(default_pass)
             db.session.add(admin)
             print('\n==========================================')
@@ -49,7 +50,8 @@ def init_database():
             print(f'Email : {admin_email}')
             print(f'Mot de passe : {default_pass}')
             print('Rôle : Administrateur')
-            print('Veuillez changer ce mot de passe après connexion.')
+            print('Conservez ce mot de passe en lieu sûr ;')
+            print('changez-le après la première connexion.')
             print('==========================================\n')
         else:
             print('Compte administrateur par défaut déjà existant.')

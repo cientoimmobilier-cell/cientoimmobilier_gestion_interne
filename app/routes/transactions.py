@@ -228,13 +228,13 @@ def delete_transaction(tx_id):
         
     return redirect(url_for('transactions.list_transactions'))
 
-@transactions.route('/export')
+@transactions.route('/export', methods=['POST'])
 @login_required
 @role_required('Comptable', 'Agent immobilier')
 def export_transactions():
-    search = request.args.get('search', '')
-    type_tx = request.args.get('type_transaction', '')
-    statut = request.args.get('statut', '')
+    search = request.form.get('search', '')
+    type_tx = request.form.get('type_transaction', '')
+    statut = request.form.get('statut', '')
     
     stmt = select(Transaction)
     
@@ -446,7 +446,7 @@ def add_contract(tx_id):
     try:
         safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
             file_storage=file,
-            upload_subdir='uploads/documents',
+            upload_subdir='documents',
             allowed_extensions=ALLOWED_PDFS,
             max_size=max_size,
             category='pdf',
@@ -482,7 +482,7 @@ def add_contract(tx_id):
         
     return redirect(url_for('transactions.view_transaction', tx_id=tx_id))
 
-@transactions.route('/recu/<int:tx_id>')
+@transactions.route('/recu/<int:tx_id>', methods=['POST'])
 @login_required
 @role_required('Comptable', 'Agent immobilier')
 def download_transaction_pdf(tx_id):
@@ -506,7 +506,7 @@ def download_transaction_pdf(tx_id):
         flash("Erreur lors de la génération du PDF. Veuillez réessayer.", "danger")
         return redirect(url_for('transactions.list_transactions'))
 
-@transactions.route('/paiement/recu/<int:pay_id>')
+@transactions.route('/paiement/recu/<int:pay_id>', methods=['POST'])
 @login_required
 @role_required('Comptable', 'Agent immobilier')
 def download_payment_receipt_pdf_route(pay_id):

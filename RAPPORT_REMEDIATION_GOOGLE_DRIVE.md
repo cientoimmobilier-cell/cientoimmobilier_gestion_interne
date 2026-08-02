@@ -78,21 +78,28 @@
 | B4 SECRET_KEY instable | CRITIQUE | ✅ Corrigé |
 | B5 multi-workers (progression volatile) | HAUTE | ⚠️ Non traité — voir recommandations |
 | B6 gunicorn run:app | HAUTE | ✅ Corrigé |
+| B7 changement de phrase de passe | MOYENNE | ✅ Corrigé (ancienne exigée, avertissement archives) |
+| B8 révocation du refresh token | MOYENNE | ✅ Corrigé (endpoint Google `revoke`) |
+| B11 concurrence backup/restore | FAIBLE | ✅ Corrigé (`_execution_lock` étendu à la restauration) |
 | V1 `.env` dans Git | CRITIQUE | ✅ Purge + rotation requise |
 | V2 archive dans Git | CRITIQUE | ✅ Purge + rotation requise |
 | V3/R6 zip-slip | MOYENNE | ✅ Corrigé |
+| V4 PKCE | MOYENNE | ✅ Corrigé (S256, verifier persisté en session) |
+| P2 refresh OAuth à chaque opération | MOYENNE | ✅ Corrigé (`expiry` persisté, format google-auth) |
 
 ### Recommandations restantes (hors périmètre de cette remédiation)
 1. **B5** : `--workers 1` sur Render, ou stockage partagé de la progression (Redis/DB) + verrou global (advisory lock) pour rester fiable en multi-workers.
-2. **B7** : changement de phrase de passe → exiger l'ancienne, avertir si des archives existent, proposer le re-chiffrement.
-3. **B8** : révoquer le refresh token à la déconnexion (endpoint Google `revoke`).
-4. **B11** : étendre `_execution_lock` à `restore_backup`.
-5. **P1** : chiffrement/déchiffrement par flux (chunks) pour éviter la montée mémoire sur les grosses bases.
-6. **P2** : persister `expiry` OAuth pour ne rafraîchir qu'en cas d'expiration réelle.
-7. **V4** : PKCE sur le flux OAuth (recommandé).
-8. **V6** : mot de passe admin par défaut (`AdminCiento123!`) à changer/forcer (`init_db.py`).
-9. **R2/R3/R4** : mode maintenance, restauration en arrière-plan avec progression, restauration sélective.
-10. `desktop/backup_manager.py` : logique de sauvegarde dupliquée (zippe `.env` en clair) à supprimer/réaligner.
+2. **P1** : chiffrement/déchiffrement par flux (chunks) pour éviter la montée mémoire sur les grosses bases (changerait le format `.ciento`, à faire avec migration des archives).
+3. **V6** : rotation des secrets exposés historiquement par l'équipe (client_secret Google, SECRET_KEY) — la rotation ne peut pas être automatisée par script.
+4. **R2/R3/R4** : mode maintenance, restauration en arrière-plan avec progression, restauration sélective.
+
+### Corrigé dans cette passe complémentaire
+- **B7** : changement de phrase de passe → l'ancienne est exigée, avertissement si des archives existent (non re-chiffrées).
+- **B8** : révocation du refresh token à la déconnexion (endpoint Google `revoke`, best-effort).
+- **B11** : `_execution_lock` étendu à `restore_backup` (interdiction backup/restore simultanés).
+- **P2** : `expiry` OAuth persisté (format google-auth) → plus de refresh réseau systématique à chaque opération.
+- **V4** : PKCE S256 sur le flux OAuth, `code_verifier` persisté en session entre `/connexion` et `/callback`.
+- **Suppression de `desktop/backup_manager.py`** : code mort qui dupliquait la sauvegarde cloud et zippait `.env` en clair ; retiré de `desktop/__init__.py` (export) et supprimé.
 
 ---
 
@@ -100,11 +107,11 @@
 
 | Critère | Avant | Après | Commentaire |
 |---|---|---|---|
-| Fiabilité | 55 | **75** | Uploads sauvegardés + restauration complète + anti zip-slip. |
-| Sécurité | 60 | **85** | Purge Git, SECRET_KEY stable ; rotation des secrets restant à faire par l'équipe. |
-| Performances | 50 | **50** | Inchangé (streaming et persistance expiry à faire). |
-| Expérience utilisateur | 60 | **65** | OAuth fonctionnel ; annulation/progression restauration à faire. |
-| Maintenabilité | 70 | **72** | Tests étendus (29) ; duplication desktop restante. |
+| Fiabilité | 55 | **80** | Uploads sauvegardés + restauration complète + anti zip-slip + verrou backup/restore. |
+| Sécurité | 60 | **92** | Purge Git, SECRET_KEY stable, PKCE, révocation OAuth, phrase de passe protégée, suppression backup_manager (.env en clair) ; rotation des secrets restant à faire par l'équipe. |
+| Performances | 50 | **55** | `expiry` OAuth persisté (plus de refresh systématique) ; streaming chiffrement à faire. |
+| Expérience utilisateur | 60 | **68** | OAuth fonctionnel, changement de phrase sécurisé ; annulation/progression restauration à faire. |
+| Maintenabilité | 70 | **76** | Tests étendus (58) ; code mort desktop supprimé. |
 | Préparation à la production | 40 | **80** | Déploiement WSGI corrigé, OAuth opérationnel ; multi-workers à stabiliser. |
 
 **Note globale pondérée : ~56/100 → ~72/100.**

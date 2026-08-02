@@ -165,7 +165,7 @@
             <h6 class="fw-bold text-dark mb-3"><i class="fa-solid fa-user-shield text-warning me-2"></i>Propriétaire du bien</h6>
             <div class="d-flex align-items-center">
                 <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold me-3" style="width: 44px; height: 44px;">
-                    {{ property.proprietaire.prenom[0]|upper }}{{ property.proprietaire.nom[0]|upper }}
+                    {{ (property.proprietaire.prenom[:1] or '?')|upper }}{{ (property.proprietaire.nom[:1] or '?')|upper }}
                 </div>
                 <div>
                     <div class="fw-semibold text-dark">{{ property.proprietaire.prenom }} {{ property.proprietaire.nom }}</div>

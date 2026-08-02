@@ -1,4 +1,6 @@
 import os
+from urllib.parse import quote, quote_plus
+
 from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -25,7 +27,10 @@ class Config:
     # Application 100 % locale (desktop Windows) : PostgreSQL local uniquement,
     # plus aucune URL de base de données cloud (DATABASE_URL / POSTGRES_URL de
     # Render/Vercel ont été retirées).
-    SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    SQLALCHEMY_DATABASE_URI = (
+        f"postgresql://{quote_plus(db_user)}:{quote_plus(db_password)}"
+        f"@{db_host}:{db_port}/{quote(db_name, safe='')}"
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(basedir, 'app', 'static', 'uploads')

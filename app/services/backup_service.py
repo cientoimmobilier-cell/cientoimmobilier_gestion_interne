@@ -7,6 +7,7 @@ via un magasin en memoire (job_id) interroge par l'interface web (progression,
 vitesse, taille, temps restant).
 """
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -312,6 +313,16 @@ class BackupService:
 
     # ── Restauration ───────────────────────────────────────────────────────
     def restore_backup(self, record_id, passphrase):
+        if not self._execution_lock.acquire(blocking=False):
+            raise GoogleDriveError(
+                'Une sauvegarde ou une restauration est déjà en cours. '
+                'Patientez avant de relancer une restauration.')
+        try:
+            return self._restore_backup(record_id, passphrase)
+        finally:
+            self._execution_lock.release()
+
+    def _restore_backup(self, record_id, passphrase):
         record = db.session.get(CloudBackupRecord, record_id)
         if record is None:
             raise GoogleDriveError('Sauvegarde introuvable.')
@@ -330,16 +341,18 @@ class BackupService:
             except CryptoError as exc:
                 raise GoogleDriveError(str(exc))
             with zipfile.ZipFile(BytesIO(data)) as zf:
-                zf.extractall(tmpdir)
-                names = zf.namelist()
                 upload_root = (self.app.config.get('UPLOAD_FOLDER') or '')
+                # Restauration ciblée des uploads (anti zip-slip dans
+                # _restore_upload_files) — aucun extractall global.
                 _restore_upload_files(zf, 'uploads', upload_root)
-            sql_name = next((n for n in names
-                             if n.endswith('base_de_donnees.sql')), None)
-            if not sql_name:
-                raise GoogleDriveError('Archive invalide : base_de_donnees.sql absent.')
-            with open(os.path.join(tmpdir, sql_name), 'r', encoding='utf-8') as fh:
-                script = fh.read()
+                # Extraction sécurisée du script SQL (lecture directe, jamais
+                # d'extraction à partir d'un nom issu de l'archive).
+                sql_name = next((n for n in zf.namelist()
+                                 if n.endswith('base_de_donnees.sql')), None)
+                if not sql_name:
+                    raise GoogleDriveError('Archive invalide : base_de_donnees.sql absent.')
+                script = zf.read(sql_name).decode('utf-8')
+            _validate_restore_sql(script)
             from sqlalchemy import text
             db.session.remove()
             with db.engine.connect() as conn:
@@ -360,6 +373,33 @@ class BackupService:
                 self.progress.remove(job_id)
                 return None
         return job
+
+
+def _validate_restore_sql(script):
+    """Refuse les instructions SQL que l'export légitime ne produit jamais.
+
+    L'archive est authentifiée (AES-GCM + passphrase), mais cette couche
+    supplémentaire bloque les scripts hostiles (exfiltration via COPY/COPY TO,
+    ALTER/DROP hors tables, GRANT, pg_*...) en cas de passphrase compromise.
+    Les mots-clés autorisés par l'export : BEGIN/COMMIT, DROP TABLE, CREATE
+    TABLE, INSERT INTO, SELECT setval, commentaires '--'.
+    """
+    forbidden = (
+        r'\bcopy\b', r'\balter\b', r'\bgrant\b', r'\brevoke\b',
+        r'\bcreate\s+(database|user|role|extension|procedure|function|trigger|schema)\b',
+        r'\bdrop\s+(database|user|role|extension|procedure|function|trigger|schema)\b',
+        r'\btruncate\b', r'\bdelete\s+from\b', r'\bupdate\s+[a-z_]+\s+set\b',
+        r'\bmerge\b',
+        r'\\copy', r'\\!', r'\\\.',
+        r'pg_read_file|pg_write_file|pg_ls_dir|pg_stat_file|lo_import|lo_export|pg_sleep',
+        r'\bdo\s*\$', r'copy\s+.*\bto\b',
+    )
+    lower = script.lower()
+    for pattern in forbidden:
+        if re.search(pattern, lower):
+            raise GoogleDriveError(
+                f'Script SQL de restauration refusé : instruction non conforme '
+                f'({pattern}). Vérifiez la provenance de la sauvegarde.')
 
 
 def execute_sql_script(conn, script):

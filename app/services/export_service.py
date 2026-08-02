@@ -23,6 +23,7 @@ from app.models import (
     BienAirbnb, Client, Contrat, Occupation, Proprietaire,
     Propriete, Transaction, Utilisateur,
 )
+from app.utils.helpers import neutralize_formula
 
 REPORT_GROUPS = {
     'clients': {'model': Client, 'label': 'Clients'},
@@ -38,6 +39,11 @@ REPORT_GROUPS = {
 
 def _prettify(name):
     return re.sub(r'_+', ' ', name).replace(' id', ' n°').strip().title()
+
+
+def _esc_pdf(value):
+    """Échappe les balises mini-HTML interprétées par ReportLab."""
+    return str(value).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
 def _serialize(value):
@@ -68,7 +74,9 @@ def export_csv(group_key):
     writer = csv.writer(buffer, delimiter=';', quoting=csv.QUOTE_MINIMAL)
     writer.writerow([_prettify(c.name) for c in columns])
     for obj in _rows(group_key):
-        writer.writerow([_serialize(getattr(obj, c.name)) for c in columns])
+        writer.writerow([
+            neutralize_formula(_serialize(getattr(obj, c.name))) for c in columns
+        ])
     return buffer.getvalue().encode('utf-8-sig')
 
 
@@ -82,7 +90,9 @@ def export_excel(group_key):
     for cell in ws[1]:
         cell.font = Font(bold=True)
     for obj in _rows(group_key):
-        ws.append([_serialize(getattr(obj, c.name)) for c in columns])
+        ws.append([
+            neutralize_formula(_serialize(getattr(obj, c.name))) for c in columns
+        ])
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
@@ -131,7 +141,10 @@ def export_pdf(group_key):
     ]
     data = [[Paragraph(_prettify(c.name), header_style) for c in columns]]
     for obj in rows:
-        data.append([Paragraph(str(_serialize(getattr(obj, c.name))), cell_style) for c in columns])
+        data.append([
+            Paragraph(_esc_pdf(_serialize(getattr(obj, c.name))), cell_style)
+            for c in columns
+        ])
 
     if rows:
         table = Table(data, repeatRows=1)
@@ -215,3 +228,4 @@ def export_sql():
                 )
     lines.append('COMMIT;')
     return '\n'.join(lines)
+

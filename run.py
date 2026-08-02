@@ -20,7 +20,10 @@ def get_local_ip():
     import socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
+        s.settimeout(2)
+        # Adresse TEST-NET réservée (RFC 5737) : aucun paquet n'est émis pour
+        # un connect() UDP, il ne sert qu'à choisir l'interface locale.
+        s.connect(('192.0.2.1', 9))
         ip = s.getsockname()[0]
         s.close()
         return ip
@@ -28,7 +31,7 @@ def get_local_ip():
         return '127.0.0.1'
 
 
-def run_web(port, debug):
+def run_web(port, debug, host='127.0.0.1'):
     from app import create_app
     app = create_app()
     local_ip = get_local_ip()
@@ -36,10 +39,11 @@ def run_web(port, debug):
     print(f"  CIENTO IMMOBILIER — La Solution en Service Immobilier")
     print(f"{'='*55}")
     print(f"  Accès local     : http://127.0.0.1:{port}")
-    print(f"  Accès réseau    : http://{local_ip}:{port}")
+    if host == '0.0.0.0':
+        print(f"  Accès réseau    : http://{local_ip}:{port}")
     print(f"  Mode debug      : {'Oui' if debug else 'Non'}")
     print(f"{'='*55}\n")
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    app.run(host=host, port=port, debug=debug)
 
 
 def run_desktop_mode(port, debug, no_splash):
@@ -57,19 +61,21 @@ def main():
     parser.add_argument('--desktop', action='store_true', help='Desktop mode (native window)')
     parser.add_argument('--headless', action='store_true', help='Server only, no UI')
     parser.add_argument('--port', type=int, default=None, help='Port number')
+    parser.add_argument('--host', default=None, help="Adresse d'écoute (défaut: 127.0.0.1)")
     parser.add_argument('--debug', action='store_true', help='Debug mode')
     parser.add_argument('--no-splash', action='store_true', help='Skip splash screen')
     args = parser.parse_args()
 
     port = args.port or int(os.environ.get('PORT', 5000))
     debug = args.debug or os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
+    host = args.host or '127.0.0.1'
 
     if args.headless:
         run_headless(port)
     elif args.desktop:
         run_desktop_mode(port, debug, args.no_splash)
     else:
-        run_web(port, debug)
+        run_web(port, debug, host)
 
 
 if __name__ == '__main__':

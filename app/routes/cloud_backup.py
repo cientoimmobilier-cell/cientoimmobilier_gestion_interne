@@ -8,6 +8,7 @@ chiffrees AES-256.
 """
 import logging
 import os
+import secrets
 import shutil
 import tempfile
 
@@ -94,8 +95,9 @@ def connect():
         flash('Configurez d\'abord le client_id et le client_secret Google.', 'warning')
         return redirect(url_for('cloud_backup.index'))
     try:
-        auth_url, state = service.authorization_url(_redirect_uri())
+        auth_url, state, code_verifier = service.authorization_url(_redirect_uri())
         session['cloud_oauth_state'] = state
+        session['cloud_oauth_verifier'] = code_verifier
         return redirect(auth_url)
     except Exception as exc:
         logger.error('[CLOUD] Erreur connexion Google: %s', exc)
@@ -116,9 +118,10 @@ def callback():
     if not code or state != session.pop('cloud_oauth_state', None):
         flash('Connexion Google invalide (état de session incorrect).', 'danger')
         return redirect(url_for('cloud_backup.index'))
+    code_verifier = session.pop('cloud_oauth_verifier', None)
     try:
         service = GoogleDriveService()
-        service.exchange_code(code, _redirect_uri())
+        service.exchange_code(code, _redirect_uri(), code_verifier=code_verifier)
         flash('Compte Google connecté avec succès.', 'success')
     except Exception as exc:
         logger.error('[CLOUD] Erreur échange code OAuth: %s', exc)
@@ -131,8 +134,10 @@ def callback():
 @login_required
 @role_required('Administrateur', 'Directeur')
 def disconnect():
-    GoogleDriveService().clear_credentials()
-    flash('Compte Google déconnecté.', 'info')
+    service = GoogleDriveService()
+    service.revoke_refresh_token()
+    service.clear_credentials()
+    flash('Compte Google déconnecté (jeton révoqué).', 'info')
     return redirect(url_for('cloud_backup.index'))
 
 
@@ -167,6 +172,8 @@ def suggest_passphrase():
 @login_required
 @role_required('Administrateur', 'Directeur')
 def save_passphrase():
+    setting = CloudBackupSetting.get()
+    was_set = bool(setting.encryption_passphrase_wrapped)
     passphrase = request.form.get('passphrase', '')
     confirmation = request.form.get('confirmation', '')
     if len(passphrase) < PASSPHRASE_MIN:
@@ -175,11 +182,26 @@ def save_passphrase():
     if passphrase != confirmation:
         flash('La confirmation de la phrase de passe ne correspond pas.', 'danger')
         return redirect(url_for('cloud_backup.index'))
-    setting = CloudBackupSetting.get()
+    if was_set:
+        old_passphrase = request.form.get('old_passphrase', '')
+        current = crypto_service.unwrap_secret(setting.encryption_passphrase_wrapped)
+        if not old_passphrase or not secrets.compare_digest(old_passphrase, current):
+            flash('L\'ancienne phrase de passe est incorrecte. La modification est annulée.', 'danger')
+            return redirect(url_for('cloud_backup.index'))
     setting.encryption_passphrase_wrapped = crypto_service.wrap_secret(passphrase)
     setting.passphrase_set_at = db.func.now()
     db.session.commit()
-    flash('Phrase de passe de chiffrement enregistrée.', 'success')
+    if was_set:
+        archive_count = db.session.execute(
+            select(db.func.count(CloudBackupRecord.id))).scalar() or 0
+        if archive_count:
+            flash('Phrase de passe mise à jour. Attention : les archives déjà '
+                  f'téléversées ({archive_count}) restent chiffrées avec '
+                  'l\'ancienne phrase de passe et ne sont pas re-chiffrées.', 'warning')
+        else:
+            flash('Phrase de passe de chiffrement mise à jour.', 'success')
+    else:
+        flash('Phrase de passe de chiffrement enregistrée.', 'success')
     return redirect(url_for('cloud_backup.index'))
 
 

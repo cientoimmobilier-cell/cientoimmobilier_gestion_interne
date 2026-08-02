@@ -87,7 +87,7 @@ class DemandeClient(db.Model):
     __tablename__ = 'demandes_clients'
     
     id = db.Column(db.Integer, primary_key=True)
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='CASCADE'), nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='CASCADE'), nullable=False, index=True)
     type_operation = db.Column(db.String(20))  # Location, Achat, Vente, Gestion, Autre
     type_bien = db.Column(db.String(50))      # Maison, Appartement, Bureau, Local commercial, Studio
     zone_recherche = db.Column(db.Text)
@@ -125,7 +125,7 @@ class Propriete(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     reference_bien = db.Column(db.String(30), unique=True, nullable=False)
-    proprietaire_id = db.Column(db.Integer, db.ForeignKey('proprietaires.id', ondelete='SET NULL'))
+    proprietaire_id = db.Column(db.Integer, db.ForeignKey('proprietaires.id', ondelete='SET NULL'), index=True)
     titre = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text)
     type_bien = db.Column(db.String(50), nullable=False, index=True)  # Maison, Appartement, Terrain, Villa, Bureau, Local commercial, Entrepôt, Immeuble
@@ -182,7 +182,7 @@ class PhotoPropriete(db.Model):
     __tablename__ = 'photos_proprietes'
     
     id = db.Column(db.Integer, primary_key=True)
-    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='CASCADE'), nullable=False)
+    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='CASCADE'), nullable=False, index=True)
     chemin_fichier = db.Column(db.Text, nullable=False)
     photo_principale = db.Column(db.Boolean, default=False)
     date_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -192,7 +192,7 @@ class DocumentPropriete(db.Model):
     __tablename__ = 'documents_proprietes'
     
     id = db.Column(db.Integer, primary_key=True)
-    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='CASCADE'), nullable=False)
+    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='CASCADE'), nullable=False, index=True)
     nom_document = db.Column(db.String(255), nullable=False)
     type_document = db.Column(db.String(100))
     chemin_fichier = db.Column(db.Text, nullable=False)
@@ -203,9 +203,9 @@ class Visite(db.Model):
     __tablename__ = 'visites'
     
     id = db.Column(db.Integer, primary_key=True)
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='CASCADE'), nullable=False)
-    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='CASCADE'), nullable=False)
-    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='CASCADE'), nullable=False, index=True)
+    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='CASCADE'), nullable=False, index=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'), index=True)
     date_visite = db.Column(db.DateTime, nullable=False)
     compte_rendu = db.Column(db.Text)
     statut = db.Column(db.String(30), default='Planifiée')  # Planifiée, Effectuée, Annulée, Non présentée
@@ -216,9 +216,9 @@ class Transaction(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     reference_transaction = db.Column(db.String(50), unique=True, nullable=False)
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
-    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='SET NULL'))
-    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'), index=True)
+    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='SET NULL'), index=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'), index=True)
     type_transaction = db.Column(db.String(20), nullable=False, index=True)  # Vente, Location
     montant = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
@@ -236,7 +236,7 @@ class Contrat(db.Model):
     __tablename__ = 'contrats'
     
     id = db.Column(db.Integer, primary_key=True)
-    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='CASCADE'))
+    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='CASCADE'), index=True)
     numero_contrat = db.Column(db.String(50), nullable=False)
     date_signature = db.Column(db.Date, nullable=False)
     date_debut = db.Column(db.Date)
@@ -253,7 +253,7 @@ class Paiement(db.Model):
     __tablename__ = 'paiements'
     
     id = db.Column(db.Integer, primary_key=True)
-    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='CASCADE'), nullable=False)
+    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='CASCADE'), nullable=False, index=True)
     montant = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
     mode_paiement = db.Column(db.String(50), nullable=False)  # Espèces, Virement, Chèque, Carte
@@ -266,8 +266,8 @@ class Commission(db.Model):
     __tablename__ = 'commissions'
     
     id = db.Column(db.Integer, primary_key=True)
-    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='CASCADE'), nullable=False)
-    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='CASCADE'), nullable=False)
+    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='CASCADE'), nullable=False, index=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='CASCADE'), nullable=False, index=True)
     pourcentage = db.Column(db.Numeric(5, 2), nullable=False)
     montant = db.Column(db.Numeric(15, 2), nullable=False)
     date_calcul = db.Column(db.Date, default=lambda: datetime.now(timezone.utc))
@@ -277,7 +277,7 @@ class JournalActivite(db.Model):
     __tablename__ = 'journal_activites'
     
     id = db.Column(db.Integer, primary_key=True)
-    utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'), index=True)
     action = db.Column(db.String(255), nullable=False)  # Connexion, Création, Modification, Suppression, Export
     table_concernee = db.Column(db.String(100))
     enregistrement_id = db.Column(db.Integer)
@@ -302,8 +302,8 @@ class BienAirbnb(db.Model):
     prix_par_nuit = db.Column(db.Numeric(15, 2), nullable=False)
     devise = db.Column(db.String(10), default='EUR')
     frais_menage = db.Column(db.Numeric(15, 2), default=0)
-    proprietaire_id = db.Column(db.Integer, db.ForeignKey('proprietaires.id', ondelete='SET NULL'))
-    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
+    proprietaire_id = db.Column(db.Integer, db.ForeignKey('proprietaires.id', ondelete='SET NULL'), index=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'), index=True)
     statut = db.Column(db.String(30), default='Actif', index=True)  # Actif, Inactif, En maintenance
     lien_airbnb = db.Column(db.Text)
     wifi = db.Column(db.Boolean, default=False)
@@ -326,7 +326,7 @@ class ReservationAirbnb(db.Model):
     __tablename__ = 'reservations_airbnb'
     
     id = db.Column(db.Integer, primary_key=True)
-    bien_airbnb_id = db.Column(db.Integer, db.ForeignKey('biens_airbnb.id', ondelete='CASCADE'), nullable=False)
+    bien_airbnb_id = db.Column(db.Integer, db.ForeignKey('biens_airbnb.id', ondelete='CASCADE'), nullable=False, index=True)
     nom_voyageur = db.Column(db.String(200), nullable=False)
     telephone_voyageur = db.Column(db.String(30))
     email_voyageur = db.Column(db.String(150))
@@ -373,7 +373,7 @@ class Caisse(db.Model):
     nom = db.Column(db.String(100), nullable=False, unique=True)
     solde = db.Column(db.Numeric(15, 2), default=0)
     devise = db.Column(db.String(10), default='EUR')
-    responsable_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
+    responsable_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'), index=True)
     date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     actif = db.Column(db.Boolean, default=True)
 
@@ -399,10 +399,10 @@ class MouvementFinancier(db.Model):
     methode_paiement = db.Column(db.String(50))  # Espèces, Virement, Carte, Chèque
     
     # Liens optionnels
-    compte_bancaire_id = db.Column(db.Integer, db.ForeignKey('comptes_bancaires.id', ondelete='SET NULL'))
-    caisse_id = db.Column(db.Integer, db.ForeignKey('caisses.id', ondelete='SET NULL'))
-    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='SET NULL'))
-    utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
+    compte_bancaire_id = db.Column(db.Integer, db.ForeignKey('comptes_bancaires.id', ondelete='SET NULL'), index=True)
+    caisse_id = db.Column(db.Integer, db.ForeignKey('caisses.id', ondelete='SET NULL'), index=True)
+    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='SET NULL'), index=True)
+    utilisateur_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'), index=True)
     
     date_creation = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -415,8 +415,8 @@ class Facture(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     numero_facture = db.Column(db.String(50), unique=True, nullable=False)
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
-    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='SET NULL'))
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'), index=True)
+    transaction_id = db.Column(db.Integer, db.ForeignKey('transactions.id', ondelete='SET NULL'), index=True)
     date_emission = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     date_echeance = db.Column(db.Date)
     
@@ -446,9 +446,9 @@ class Recu(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     numero_recu = db.Column(db.String(50), unique=True, nullable=False)
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'))
-    facture_id = db.Column(db.Integer, db.ForeignKey('factures.id', ondelete='SET NULL'))
-    paiement_id = db.Column(db.Integer, db.ForeignKey('paiements.id', ondelete='SET NULL'))
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='SET NULL'), index=True)
+    facture_id = db.Column(db.Integer, db.ForeignKey('factures.id', ondelete='SET NULL'), index=True)
+    paiement_id = db.Column(db.Integer, db.ForeignKey('paiements.id', ondelete='SET NULL'), index=True)
     
     date_emission = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc))
     montant = db.Column(db.Numeric(15, 2), nullable=False)
@@ -510,7 +510,7 @@ class CriterePartenaire(db.Model):
     __tablename__ = 'criteres_partenaires'
     
     id = db.Column(db.Integer, primary_key=True)
-    partenaire_id = db.Column(db.Integer, db.ForeignKey('partenaires.id', ondelete='CASCADE'), nullable=False)
+    partenaire_id = db.Column(db.Integer, db.ForeignKey('partenaires.id', ondelete='CASCADE'), nullable=False, index=True)
     nom_critere = db.Column(db.String(100), nullable=False)
     commission = db.Column(db.Numeric(10, 2))
     devise = db.Column(db.String(10), default='EUR')
@@ -526,7 +526,7 @@ class DocumentPartenaire(db.Model):
     __tablename__ = 'documents_partenaires'
     
     id = db.Column(db.Integer, primary_key=True)
-    partenaire_id = db.Column(db.Integer, db.ForeignKey('partenaires.id', ondelete='CASCADE'), nullable=False)
+    partenaire_id = db.Column(db.Integer, db.ForeignKey('partenaires.id', ondelete='CASCADE'), nullable=False, index=True)
     nom_document = db.Column(db.String(255), nullable=False)
     chemin_fichier = db.Column(db.Text, nullable=False)
     date_upload = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -542,10 +542,10 @@ class Occupation(db.Model):
     statut = db.Column(db.String(30), default='En préparation', index=True)
     
     # FK relations
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='RESTRICT'), nullable=False)
-    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='RESTRICT'), nullable=False)
-    contrat_id = db.Column(db.Integer, db.ForeignKey('contrats.id', ondelete='RESTRICT'), nullable=False)
-    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='RESTRICT'), nullable=False)
+    client_id = db.Column(db.Integer, db.ForeignKey('clients.id', ondelete='RESTRICT'), nullable=False, index=True)
+    propriete_id = db.Column(db.Integer, db.ForeignKey('proprietes.id', ondelete='RESTRICT'), nullable=False, index=True)
+    contrat_id = db.Column(db.Integer, db.ForeignKey('contrats.id', ondelete='RESTRICT'), nullable=False, index=True)
+    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='RESTRICT'), nullable=False, index=True)
     
     # Dates
     date_entree = db.Column(db.Date, nullable=False, index=True)
@@ -606,7 +606,7 @@ class RapportVisite(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     occupation_id = db.Column(db.Integer, db.ForeignKey('occupations.id', ondelete='CASCADE'), nullable=False, index=True)
-    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'))
+    agent_id = db.Column(db.Integer, db.ForeignKey('utilisateurs.id', ondelete='SET NULL'), index=True)
     date_visite = db.Column(db.DateTime, nullable=False, index=True)
     type_visite = db.Column(db.String(30), nullable=False)
     commentaires = db.Column(db.Text)

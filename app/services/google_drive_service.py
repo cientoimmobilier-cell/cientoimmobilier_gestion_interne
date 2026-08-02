@@ -5,18 +5,27 @@ OAuth 2.0 uniquement (jamais de mot de passe Google). Le jeton d'acces, le
 refresh token et les identifiants OAuth client sont stockes chiffres en
 AES-256 dans la table cloud_backup_settings.
 """
+import base64
+import hashlib
 import json
+import logging
 import os
+import secrets
 import time
+import urllib.parse
+import urllib.request
 
 from app import db
 from app.models import CloudBackupSetting
 from app.services.crypto_service import unwrap_secret, wrap_secret
 
+logger = logging.getLogger(__name__)
+
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 ROOT_NAME = 'CIENTO-IMMOBILIER-BACKUPS'
 FOLDER_NAMES = ['Daily', 'Weekly', 'Monthly', 'Archive']
 MIME_OCTET = 'application/octet-stream'
+EXPIRY_FORMAT = '%Y-%m-%dT%H:%M:%S'  # format attendu par google-auth (naïf, UTC)
 
 
 class GoogleDriveError(Exception):
@@ -69,16 +78,27 @@ class GoogleDriveService:
 
     def authorization_url(self, redirect_uri):
         flow = self._build_flow(redirect_uri)
+        code_verifier, code_challenge = self._pkce_pair()
         auth_url, state = flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
             prompt='consent',
+            code_challenge=code_challenge,
+            code_challenge_method='S256',
         )
-        return auth_url, state
+        return auth_url, state, code_verifier
 
-    def exchange_code(self, code, redirect_uri):
+    @staticmethod
+    def _pkce_pair():
+        """Génère une paire PKCE (RFC 7636) : verifier aléatoire + challenge S256."""
+        verifier = secrets.token_urlsafe(64)
+        digest = hashlib.sha256(verifier.encode('ascii')).digest()
+        challenge = base64.urlsafe_b64encode(digest).rstrip(b'=').decode('ascii')
+        return verifier, challenge
+
+    def exchange_code(self, code, redirect_uri, code_verifier=None):
         flow = self._build_flow(redirect_uri)
-        flow.fetch_token(code=code)
+        flow.fetch_token(code=code, code_verifier=code_verifier)
         self._store_credentials(flow.credentials)
 
     def _store_credentials(self, credentials):
@@ -89,6 +109,8 @@ class GoogleDriveService:
             'client_id': credentials.client_id,
             'client_secret': credentials.client_secret,
             'scopes': credentials.scopes,
+            'expiry': (credentials.expiry.strftime(EXPIRY_FORMAT)
+                       if credentials.expiry is not None else None),
         }
         self.setting.token_encrypted = wrap_secret(json.dumps(data))
         db.session.commit()
@@ -104,6 +126,37 @@ class GoogleDriveService:
             credentials.refresh(Request())
             self._store_credentials(credentials)
         return credentials
+
+    def revoke_refresh_token(self):
+        """Révoque le refresh token côté Google (endpoint revoke), best-effort.
+
+        Appelé à la déconnexion pour que le jeton ne reste pas actif chez
+        Google (audit B8). Ne lève jamais d'exception : la révocation est un
+        geste de sécurité complémentaire, pas un prérequis à la déconnexion.
+        """
+        if not self.is_connected():
+            return
+        try:
+            info = json.loads(unwrap_secret(self.setting.token_encrypted))
+        except Exception:
+            return
+        refresh_token = info.get('refresh_token')
+        if not refresh_token:
+            return
+        params = urllib.parse.urlencode({'token': refresh_token})
+        req = urllib.request.Request(
+            'https://oauth2.googleapis.com/revoke',
+            data=params.encode('ascii'),
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            method='POST',
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                logger.info('[GDRIVE] Révocation OAuth : HTTP %s',
+                            resp.status)
+        except Exception as exc:
+            logger.warning('[GDRIVE] Révocation impossible (best-effort): %s',
+                           exc)
 
     def clear_credentials(self):
         self.setting.token_encrypted = None

@@ -71,6 +71,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Sélecteur « lignes par page » — compatible CSP (pas de gestionnaire inline)
+    document.querySelectorAll('.per-page-select').forEach(function(select) {
+        select.addEventListener('change', function() {
+            var params = new URLSearchParams(window.location.search);
+            params.set('per_page', this.value);
+            params.set('page', '1');
+            window.location.href = window.location.pathname + '?' + params.toString();
+        });
+    });
+
     // Prévisualisation d'image pour l'upload de photos
     const photoInput = document.getElementById('photo-input');
     const photoPreview = document.getElementById('photo-preview');

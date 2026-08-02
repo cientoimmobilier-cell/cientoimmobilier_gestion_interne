@@ -61,9 +61,12 @@
                         <i class="fa-solid fa-pen me-2"></i>Modifier
                     </a>
                 {% endif %}
-                <a href="{{ url_for('occupation.export_pdf', occ_id=occ.id) }}" class="btn btn-outline-danger rounded-3">
-                    <i class="fa-solid fa-file-pdf me-2"></i>PDF
-                </a>
+                <form method="POST" action="{{ url_for('occupation.export_pdf', occ_id=occ.id) }}" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-danger rounded-3">
+                        <i class="fa-solid fa-file-pdf me-2"></i>PDF
+                    </button>
+                </form>
                 <a href="{{ url_for('occupation.list_occupations') }}" class="btn btn-outline-secondary rounded-3">
                     <i class="fa-solid fa-list me-2"></i>Liste
                 </a>
@@ -222,7 +225,7 @@
             <div class="p-3 bg-light rounded-3 mb-3">
                 <div class="d-flex align-items-center">
                     <div class="rounded-circle bg-warning text-dark d-flex align-items-center justify-content-center fw-bold me-3" style="width:40px;height:40px;">
-                        {{ occ.client.prenom[0]|upper }}{{ occ.client.nom[0]|upper }}
+                        {{ (occ.client.prenom[:1] or '?')|upper }}{{ (occ.client.nom[:1] or '?')|upper }}
                     </div>
                     <div>
                         <strong class="text-dark">{{ occ.client.prenom }} {{ occ.client.nom }}</strong>

@@ -55,7 +55,7 @@
             <div class="d-flex align-items-center mb-3">
                 <!-- Avatar -->
                 <div class="d-flex align-items-center justify-content-center rounded-circle fw-bold me-3" style="width: 56px; height: 56px; background: linear-gradient(135deg, #0f172a, #1e293b); color: #d97706; font-size: 1.2rem;">
-                    {{ agent.prenom[0]|upper }}{{ agent.nom[0]|upper }}
+                    {{ (agent.prenom[:1] or '?')|upper }}{{ (agent.nom[:1] or '?')|upper }}
                 </div>
                 <div class="flex-grow-1">
                     <h6 class="fw-bold text-dark mb-0">{{ agent.prenom }} {{ agent.nom }}</h6>

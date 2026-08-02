@@ -173,9 +173,12 @@
                 <a href="{{ url_for('occupation.list_occupations') }}" class="btn btn-outline-secondary rounded-3">
                     <i class="fa-solid fa-list me-2"></i>Liste des occupations
                 </a>
-                <a href="{{ url_for('occupation.export_excel') }}" class="btn btn-outline-success rounded-3">
-                    <i class="fa-solid fa-file-excel me-2"></i>Exporter Excel
-                </a>
+                <form method="POST" action="{{ url_for('occupation.export_excel') }}" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-success rounded-3">
+                        <i class="fa-solid fa-file-excel me-2"></i>Exporter Excel
+                    </button>
+                </form>
             </div>
         </div>
     </div>

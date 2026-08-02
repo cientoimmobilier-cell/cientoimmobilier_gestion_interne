@@ -18,7 +18,7 @@
         <div class="card-premium">
             <div class="text-center mb-4">
                 <div class="bg-warning text-dark rounded-circle d-inline-flex align-items-center justify-content-center fw-bold fs-3 mb-3" style="width: 80px; height: 80px;">
-                    {{ client.prenom[0]|upper }}{{ client.nom[0]|upper }}
+                    {{ (client.prenom[:1] or '?')|upper }}{{ (client.nom[:1] or '?')|upper }}
                 </div>
                 <h4 class="fw-bold text-dark mb-1">{{ client.prenom }} {{ client.nom }}</h4>
                 <span class="badge bg-light text-dark font-monospace mb-2">#{{ client.code_client }}</span>

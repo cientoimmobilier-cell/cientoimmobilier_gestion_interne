@@ -71,6 +71,8 @@ desktop.ini
 create_shortcut.*
 open_firewall.*
 start_ciento.*
+# Utilitaire de dev volontairement versionné
+!open_in_browser.bat
 
 # ── Tests et scripts de diagnostic temporaires ─────────────────────────────
 diagnose_*.py

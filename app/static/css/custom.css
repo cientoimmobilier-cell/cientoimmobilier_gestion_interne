@@ -1,5 +1,4 @@
-/* Importation d'une police moderne */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+/* Police 'Outfit' vendorée localement (vendor/outfit/outfit.css) — aucun appel réseau */
 
 :root {
     --primary-color: #0f172a;       /* Slate 900 */

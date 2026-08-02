@@ -80,13 +80,20 @@
     const AJAX_URL = "{{ url_for('owners.verifier_doublon_owner') }}";
     const EXCLUDE_ID = {{ owner.id if owner else 'null' }};
 
+    function esc(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     function showDoublon(divId, inputId, data) {
         const div = document.getElementById(divId);
         const input = document.getElementById(inputId);
         if (data.doublon) {
             div.innerHTML = `<div class="d-flex align-items-center gap-2 p-2 rounded-3" style="background:rgba(220,53,69,0.08);border:1px solid rgba(220,53,69,0.3);">
                 <i class="fa-solid fa-circle-exclamation text-danger"></i>
-                <span style="font-size:0.85rem;"><strong>Doublon détecté :</strong> Ce ${data.champ === 'telephone' ? 'téléphone' : 'e-mail'} appartient déjà à <a href="${data.url}" class="fw-bold text-danger" target="_blank">${data.nom}</a>.</span>
+                <span style="font-size:0.85rem;"><strong>Doublon détecté :</strong> Ce ${data.champ === 'telephone' ? 'téléphone' : 'e-mail'} appartient déjà à <a href="${esc(data.url)}" class="fw-bold text-danger" target="_blank">${esc(data.nom)}</a>.</span>
             </div>`;
             div.style.display = 'block';
             input.classList.add('is-invalid');

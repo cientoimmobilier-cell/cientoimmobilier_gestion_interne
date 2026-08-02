@@ -19,7 +19,10 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-file-contract text-warning me-2"></i>Résumé de la transaction</h5>
                 <div class="d-flex align-items-center gap-2">
-                    <a href="{{ url_for('transactions.download_transaction_pdf', tx_id=tx.id) }}" class="btn btn-sm btn-outline-danger rounded-3" title="Télécharger la fiche transaction PDF"><i class="fa-solid fa-file-pdf me-1"></i>Fiche PDF</a>
+                    <form method="POST" action="{{ url_for('transactions.download_transaction_pdf', tx_id=tx.id) }}" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-3" title="Télécharger la fiche transaction PDF"><i class="fa-solid fa-file-pdf me-1"></i>Fiche PDF</button>
+                    </form>
                     <span class="badge bg-opacity-10 
                         {% if tx.statut == 'Finalisée' %}bg-success text-success
                         {% elif tx.statut == 'En cours' %}bg-warning text-warning
@@ -228,7 +231,10 @@
                             <td><small class="text-muted font-monospace">{{ pay.reference_paiement or '-' }}</small></td>
                             <td class="fw-bold text-end text-success">{{ pay.montant | format_price(pay.devise) }}</td>
                             <td class="text-end">
-                                <a href="{{ url_for('transactions.download_payment_receipt_pdf_route', pay_id=pay.id) }}" class="btn btn-sm btn-outline-danger border-0 rounded-circle" title="Télécharger Reçu PDF"><i class="fa-solid fa-file-pdf"></i></a>
+                                <form method="POST" action="{{ url_for('transactions.download_payment_receipt_pdf_route', pay_id=pay.id) }}" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger border-0 rounded-circle" title="Télécharger Reçu PDF"><i class="fa-solid fa-file-pdf"></i></button>
+                                </form>
                             </td>
                         </tr>
                         {% else %}

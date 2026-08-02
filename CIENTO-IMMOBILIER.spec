@@ -5,7 +5,10 @@
 
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('assets', 'assets'), ('.env', '.')]
+# Dossier assets uniquement : le fichier .env (secrets) ne doit JAMAIS être
+# empaqueté dans l'exécutable. Il est lu depuis BASE_DIR (à côté du .exe)
+# à l'exécution, chaque poste ayant sa propre configuration.
+datas = [('assets', 'assets')]
 binaries = []
 hiddenimports = [
     'app',

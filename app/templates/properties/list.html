@@ -64,7 +64,10 @@
 <!-- Actions Toolbar -->
 <div class="row mb-4">
     <div class="col-12 d-flex justify-content-end gap-2">
-        <a href="{{ url_for('properties.export_properties') }}" class="btn btn-outline-success rounded-3"><i class="fa-solid fa-file-excel me-2"></i>Exporter Excel</a>
+        <form method="POST" action="{{ url_for('properties.export_properties') }}" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-success rounded-3"><i class="fa-solid fa-file-excel me-2"></i>Exporter Excel</button>
+        </form>
         {% if current_user.role in ['Administrateur', 'Directeur'] %}
         <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-toggle="modal" data-bs-target="#importPropertiesModal"><i class="fa-solid fa-file-import me-2"></i>Importer Excel</button>
         {% endif %}

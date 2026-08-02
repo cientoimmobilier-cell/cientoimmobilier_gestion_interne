@@ -260,7 +260,7 @@ def verifier_doublon_owner():
         return jsonify({'doublon': False, 'error': 'Erreur interne'}), 500
 
 
-@owners.route('/exporter')
+@owners.route('/exporter', methods=['POST'])
 @login_required
 @role_required('Agent immobilier', 'Assistant')
 def export_owners():

@@ -6,6 +6,10 @@ from sqlalchemy import select
 
 from app import db
 from app.models import Proprietaire
+from app.utils.helpers import neutralize_formula
+
+def _safe(value):
+    return neutralize_formula(value)
 
 def export_clients_to_excel(clients):
     wb = Workbook()
@@ -22,21 +26,21 @@ def export_clients_to_excel(clients):
     
     for client in clients:
         ws.append([
-            client.code_client or '',
-            client.nom or '',
-            client.prenom or '',
-            client.telephone or '',
-            client.telephone_secondaire or '',
-            client.email or '',
-            client.adresse or '',
-            client.ville or '',
-            client.profession or '',
-            client.zone_ciblee or '',
-            client.description or '',
+            _safe(client.code_client or ''),
+            _safe(client.nom or ''),
+            _safe(client.prenom or ''),
+            _safe(client.telephone or ''),
+            _safe(client.telephone_secondaire or ''),
+            _safe(client.email or ''),
+            _safe(client.adresse or ''),
+            _safe(client.ville or ''),
+            _safe(client.profession or ''),
+            _safe(client.zone_ciblee or ''),
+            _safe(client.description or ''),
             float(client.budget_min) if client.budget_min is not None else '',
             float(client.budget_max) if client.budget_max is not None else '',
-            client.source_client or '',
-            client.observations or ''
+            _safe(client.source_client or ''),
+            _safe(client.observations or '')
         ])
 
     for cell in ws[1]:
@@ -99,22 +103,22 @@ def export_properties_to_excel(properties):
     for prop in properties:
         owner_email = prop.proprietaire.email if prop.proprietaire else ''
         ws.append([
-            prop.reference_bien or '',
-            prop.titre or '',
-            prop.type_bien or '',
-            prop.type_operation or '',
-            prop.adresse or '',
-            prop.ville or '',
-            prop.quartier or '',
+            _safe(prop.reference_bien or ''),
+            _safe(prop.titre or ''),
+            _safe(prop.type_bien or ''),
+            _safe(prop.type_operation or ''),
+            _safe(prop.adresse or ''),
+            _safe(prop.ville or ''),
+            _safe(prop.quartier or ''),
             float(prop.prix) if prop.prix is not None else 0.0,
-            prop.devise or 'EUR',
+            _safe(prop.devise or 'EUR'),
             float(prop.superficie) if prop.superficie is not None else '',
             prop.nombre_chambres if prop.nombre_chambres is not None else '',
             prop.nombre_salles_bain if prop.nombre_salles_bain is not None else '',
             prop.nombre_garages if prop.nombre_garages is not None else '',
-            prop.statut or 'Disponible',
-            owner_email,
-            prop.description or ''
+            _safe(prop.statut or 'Disponible'),
+            _safe(owner_email),
+            _safe(prop.description or '')
         ])
 
     for cell in ws[1]:
@@ -180,13 +184,13 @@ def export_owners_to_excel(owners):
 
     for owner in owners:
         ws.append([
-            owner.nom or '',
-            owner.prenom or '',
-            owner.telephone or '',
-            owner.email or '',
-            owner.adresse or '',
-            owner.numero_identite or '',
-            owner.observations or ''
+            _safe(owner.nom or ''),
+            _safe(owner.prenom or ''),
+            _safe(owner.telephone or ''),
+            _safe(owner.email or ''),
+            _safe(owner.adresse or ''),
+            _safe(owner.numero_identite or ''),
+            _safe(owner.observations or '')
         ])
 
     for cell in ws[1]:
@@ -238,16 +242,16 @@ def export_transactions_to_excel(transactions):
     
     for tx in transactions:
         ws.append([
-            tx.reference_transaction or '',
-            tx.type_transaction or '',
-            tx.propriete.reference_bien if tx.propriete else '',
-            f"{tx.client.prenom} {tx.client.nom}" if tx.client else '',
-            f"{tx.agent.prenom} {tx.agent.nom}" if tx.agent else '',
+            _safe(tx.reference_transaction or ''),
+            _safe(tx.type_transaction or ''),
+            _safe(tx.propriete.reference_bien) if tx.propriete else '',
+            _safe(f"{tx.client.prenom} {tx.client.nom}") if tx.client else '',
+            _safe(f"{tx.agent.prenom} {tx.agent.nom}") if tx.agent else '',
             float(tx.montant) if tx.montant is not None else 0.0,
-            tx.devise or 'EUR',
+            _safe(tx.devise or 'EUR'),
             tx.date_transaction.strftime('%d/%m/%Y') if tx.date_transaction else '',
-            tx.statut or '',
-            tx.observations or ''
+            _safe(tx.statut or ''),
+            _safe(tx.observations or '')
         ])
 
     for cell in ws[1]:
@@ -278,17 +282,17 @@ def export_occupations_to_excel(occupations):
         contrat = occ.contrat.numero_contrat if occ.contrat else ''
 
         ws.append([
-            occ.numero_occupation or '',
-            occ.statut or '',
-            client_name,
-            bien_ref,
-            agent_name,
+            _safe(occ.numero_occupation or ''),
+            _safe(occ.statut or ''),
+            _safe(client_name),
+            _safe(bien_ref),
+            _safe(agent_name),
             occ.date_entree.strftime('%d/%m/%Y') if occ.date_entree else '',
             occ.date_sortie_prevue.strftime('%d/%m/%Y') if occ.date_sortie_prevue else '',
             occ.date_sortie_reelle.strftime('%d/%m/%Y') if occ.date_sortie_reelle else '',
             occ.nombre_occupants,
-            contrat,
-            occ.observations or ''
+            _safe(contrat),
+            _safe(occ.observations or '')
         ])
 
     for cell in ws[1]:

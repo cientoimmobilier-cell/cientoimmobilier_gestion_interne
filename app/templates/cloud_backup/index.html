@@ -81,7 +81,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold small">Client Secret</label>
-                    <input type="text" class="form-control form-control-sm" name="google_client_secret" required placeholder="GOCSPX-...">
+                    <input type="password" class="form-control form-control-sm" name="google_client_secret" required placeholder="GOCSPX-...">
                 </div>
                 <button type="submit" class="btn btn-primary rounded-3"><i class="fa-solid fa-floppy-disk me-1"></i> Enregistrer les identifiants (chiffrés)</button>
             </form>
@@ -124,6 +124,19 @@
 
             <form action="{{ url_for('cloud_backup.save_passphrase') }}" method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if setting.encryption_passphrase_wrapped %}
+                <div class="alert alert-warning small rounded-3 py-2 mb-3">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                    La modification remplace la phrase de passe. Les archives
+                    déjà téléversées ne sont <strong>pas re-chiffrées</strong> :
+                    vous devrez fournir l'ancienne phrase de passe pour les
+                    restaurer.
+                </div>
+                <div class="mb-2">
+                    <label class="form-label fw-semibold small">Ancienne phrase de passe (obligatoire pour modifier)</label>
+                    <input type="password" class="form-control form-control-sm" name="old_passphrase" required placeholder="Phrase de passe actuellement en vigueur">
+                </div>
+                {% endif %}
                 <div class="row g-2">
                     <div class="col-md-6">
                         <label class="form-label fw-semibold small">Nouvelle phrase de passe (min. {{ passphrase_min }} caractères)</label>

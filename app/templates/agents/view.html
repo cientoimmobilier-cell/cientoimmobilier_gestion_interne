@@ -18,7 +18,7 @@
         <div class="card-premium">
             <div class="text-center mb-4">
                 <div class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold mb-3" style="width: 80px; height: 80px; background: linear-gradient(135deg, #0f172a, #1e293b); color: #d97706; font-size: 1.8rem;">
-                    {{ agent.prenom[0]|upper }}{{ agent.nom[0]|upper }}
+                    {{ (agent.prenom[:1] or '?')|upper }}{{ (agent.nom[:1] or '?')|upper }}
                 </div>
                 <h4 class="fw-bold text-dark mb-1">{{ agent.prenom }} {{ agent.nom }}</h4>
                 <span class="badge bg-secondary rounded-pill mb-2">Agent immobilier</span>

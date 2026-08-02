@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
@@ -128,7 +128,14 @@ def create_app(config_class=None):
         for header, value in SECURITY_HEADERS.items():
             response.headers[header] = value
         response.headers['Content-Security-Policy'] = build_csp()
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        # Cache : assets vendor immuables en cache long, autres statiques 1 jour,
+        # pages dynamiques jamais en cache.
+        if request.path.startswith('/static/vendor/'):
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        elif request.path.startswith('/static/'):
+            response.headers['Cache-Control'] = 'public, max-age=86400'
+        else:
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return response
 
     # Gestionnaires d'erreurs — ne jamais divulguer les détails internes

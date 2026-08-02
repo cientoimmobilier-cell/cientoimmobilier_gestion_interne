@@ -31,7 +31,10 @@
 
                     {{ search_form('clients.list_clients', placeholder='Rechercher un client...') }}
                     
-                    <a href="{{ url_for('clients.export_clients') }}" class="btn btn-outline-success rounded-3"><i class="fa-solid fa-file-excel me-2"></i>Exporter</a>
+                    <form method="POST" action="{{ url_for('clients.export_clients') }}" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-success rounded-3"><i class="fa-solid fa-file-excel me-2"></i>Exporter</button>
+                    </form>
                     {% if current_user.role in ['Administrateur', 'Directeur'] %}
                     <button type="button" class="btn btn-outline-secondary rounded-3" data-bs-toggle="modal" data-bs-target="#importClientsModal"><i class="fa-solid fa-file-import me-2"></i>Importer</button>
                     {% endif %}

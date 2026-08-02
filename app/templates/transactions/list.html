@@ -44,7 +44,13 @@
 
                     {{ search_form('transactions.list_transactions', placeholder='Rechercher une transaction...') }}
                     
-                    <a href="{{ url_for('transactions.export_transactions', search=search, type_transaction=type_transaction, statut=statut) }}" class="btn btn-success rounded-3"><i class="fa-solid fa-file-excel me-1"></i> Exporter</a>
+                    <form method="POST" action="{{ url_for('transactions.export_transactions') }}" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="search" value="{{ search }}">
+                        <input type="hidden" name="type_transaction" value="{{ type_transaction }}">
+                        <input type="hidden" name="statut" value="{{ statut }}">
+                        <button type="submit" class="btn btn-success rounded-3"><i class="fa-solid fa-file-excel me-1"></i> Exporter</button>
+                    </form>
 
                     <a href="{{ url_for('transactions.add_transaction', next=request.full_path.rstrip('?')) }}" class="btn btn-accent rounded-3"><i class="fa-solid fa-plus me-1"></i> Saisir Transaction</a>
                 </div>

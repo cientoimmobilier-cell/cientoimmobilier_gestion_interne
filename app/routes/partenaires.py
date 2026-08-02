@@ -123,7 +123,7 @@ def add_partenaire():
                 try:
                     safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
                         file_storage=doc,
-                        upload_subdir='uploads/documents',
+                        upload_subdir='documents',
                         allowed_extensions=ALLOWED_DOCUMENTS,
                         max_size=max_size,
                         category='document',
@@ -217,7 +217,7 @@ def edit_partenaire(id):
                 try:
                     safe_path, rel_path, unique_name, file_size = validate_and_save_upload(
                         file_storage=doc,
-                        upload_subdir='uploads/documents',
+                        upload_subdir='documents',
                         allowed_extensions=ALLOWED_DOCUMENTS,
                         max_size=max_size,
                         category='document',

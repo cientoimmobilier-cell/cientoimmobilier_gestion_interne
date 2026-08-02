@@ -109,9 +109,12 @@
             {% endif %}
 
             <div class="d-grid gap-2 mt-3">
-                <a href="{{ url_for('airbnb.download_airbnb_pdf', bien_id=bien.id) }}" class="btn btn-outline-secondary w-100 rounded-3" target="_blank">
-                    <i class="fa-solid fa-file-pdf me-2"></i>Générer PDF
-                </a>
+                <form method="POST" action="{{ url_for('airbnb.download_airbnb_pdf', bien_id=bien.id) }}" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-secondary w-100 rounded-3">
+                        <i class="fa-solid fa-file-pdf me-2"></i>Générer PDF
+                    </button>
+                </form>
                 <a href="{{ url_for('airbnb.edit_bien', bien_id=bien.id) }}" class="btn btn-premium w-100 rounded-3"><i class="fa-solid fa-pen-to-square me-2"></i>Modifier</a>
                 {% if current_user.role in ['Administrateur', 'Directeur'] %}
                 <form action="{{ url_for('airbnb.delete_bien', bien_id=bien.id) }}" method="POST" data-confirm="Supprimer ce bien et toutes ses réservations ?">
