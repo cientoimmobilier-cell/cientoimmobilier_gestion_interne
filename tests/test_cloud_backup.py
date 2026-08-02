@@ -385,28 +385,28 @@ class CloudBackupTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()['progress'], 42)
 
-    # ── OAuth (étape 1 : SameSite + ProxyFix + redirect URI) ──────────────
+    # ── OAuth (étape 1 : SameSite + URL locale + redirect URI) ─────────────
     def test_config_samesite_is_lax(self):
         from config import Config as RealConfig
         self.assertEqual(RealConfig.SESSION_COOKIE_SAMESITE, 'Lax')
 
-    def test_proxyfix_middleware_applied(self):
+    def test_no_proxyfix_middleware(self):
+        # Application 100 % locale (desktop) : aucun reverse proxy à envelopper.
         from werkzeug.middleware.proxy_fix import ProxyFix
-        self.assertIsInstance(self.app.wsgi_app, ProxyFix)
+        self.assertNotIsInstance(self.app.wsgi_app, ProxyFix)
 
-    def test_proxyfix_detects_https_scheme(self):
-        # Simule un reverse proxy : X-Forwarded-Proto: https
+    def test_local_http_scheme(self):
+        # Schéma par défaut HTTP (localhost), pas de proxy HTTPS.
         from flask import request
-        with self.app.test_request_context(
-                '/', environ_base={'HTTP_X_FORWARDED_PROTO': 'https',
-                                   'HTTP_HOST': 'ciento.example.com'}):
-            self.assertEqual(request.scheme, 'https')
+        with self.app.test_request_context('/', environ_base={'HTTP_HOST': '127.0.0.1'}):
+            self.assertEqual(request.scheme, 'http')
+        self.assertEqual(self.app.config['PREFERRED_URL_SCHEME'], 'http')
 
     def test_redirect_uri_override(self):
         from flask import url_for
         with self.app.app_context():
             self.app.config['GOOGLE_OAUTH_REDIRECT_URI'] = \
-                'https://ciento.example.com/parametres/sauvegarde-cloud/callback'
+                'http://127.0.0.1:5000/parametres/sauvegarde-cloud/callback'
             self.assertEqual(_redirect_uri(), self.app.config['GOOGLE_OAUTH_REDIRECT_URI'])
 
     def test_oauth_connect_saves_state_and_redirects(self):

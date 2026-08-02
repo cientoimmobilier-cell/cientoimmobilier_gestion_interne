@@ -2,6 +2,14 @@
 
 Bienvenue sur le dépôt du logiciel de Gestion Immobilière de Ciento-Immobilier. Il s'agit d'une application professionnelle développée en Python/Flask conçue pour administrer des biens immobiliers, gérer des propriétaires, des locataires, et suivre la comptabilité.
 
+> **Architecture 100 % locale (desktop Windows)** : le logiciel fonctionne
+> exclusivement via l'application de bureau (PyWebView). Toute la pile —
+> Python → Flask local → PostgreSQL local → PyWebView → Windows — tourne sur la
+> machine de l'utilisateur. **Aucun déploiement cloud (Render/Vercel), aucun
+> serveur WSGI distant, aucune URL publique** n'est utilisé. La base de données
+> est un PostgreSQL local, jamais une base cloud (`DATABASE_URL`/`POSTGRES_URL`
+> ont été retirées).
+
 ## Fonctionnalités
 
 - **Gestion des Biens** : Ajout, modification, suppression, statut (Disponible, Vendu, Loué).
@@ -16,7 +24,7 @@ Bienvenue sur le dépôt du logiciel de Gestion Immobilière de Ciento-Immobilie
 
 ## Structure du projet
 
-La structure a été optimisée et nettoyée pour garantir les meilleures pratiques de développement Flask et préparer le déploiement en production :
+La structure a été optimisée et nettoyée pour une application de bureau Windows 100 % locale :
 
 ```
 project/
@@ -24,21 +32,22 @@ project/
 │   ├── __init__.py           # Initialisation de Flask (app factory)
 │   ├── models/               # Modèles de base de données (SQLAlchemy)
 │   ├── routes/               # Contrôleurs (Blueprints par module)
-│   ├── services/             # Logique métier (Génération PDF, Export Excel)
+│   ├── services/             # Logique métier (Génération PDF, Export Excel, Backup)
 │   ├── forms/                # Formulaires (WTForms)
 │   ├── utils/                # Fonctions d'assistance (Helpers)
 │   ├── templates/            # Vues HTML (Jinja2)
 │   └── static/               # Fichiers statiques (CSS, JS, Images, Uploads)
+├── desktop/                  # Application desktop Windows (PyWebView, notifications)
 ├── scripts/                  # Scripts utilitaires de maintenance locaux
 │   ├── clear_data.py         # Réinitialisation des données de l'application
 │   └── seed_sample_data.py   # Injection de données de démonstration
-├── tests/                    # Scripts de tests unitaires (test_app.py)
+├── tests/                    # Scripts de tests unitaires
 ├── migrations/               # Fichiers de migration de base de donnees
-├── config.py                 # Configuration principale
+├── config.py                 # Configuration principale (locale, HTTP)
 ├── init_db.py                # Script d'initialisation de la base de données
-├── render.yaml               # Fichier de configuration Render pour le déploiement
-├── run.py                    # Point d'entrée de l'application
-├── requirements.txt          # Dépendances Python optimisées (Python 3.12+)
+├── app_desktop.py            # Point d'entrée de l'application desktop
+├── run.py                    # Serveur de développement local (fallback)
+├── requirements.txt          # Dépendances Python (dont desktop)
 └── .env.example              # Modèle de variables d'environnement
 ```
 
@@ -75,28 +84,36 @@ python init_db.py
 python scripts/seed_sample_data.py
 ```
 
-### 6. Lancement du serveur Flask
+### 6. Lancement de l'application desktop
+
+```bash
+python app_desktop.py
+```
+
+Le backend Flask local démarre en arrière-plan et l'application s'ouvre dans
+une fenêtre Windows (PyWebView) — aucun navigateur externe, aucune adresse
+publique. En développement, vous pouvez aussi lancer le serveur local seul :
+
 ```bash
 python run.py
 ```
-Accédez à l'application via `http://127.0.0.1:5000`.
+Accédez alors à l'application via `http://127.0.0.1:5000`.
 
 ### 7. Lancement des tests unitaires
 Pour exécuter les vérifications de la base de données et le bon fonctionnement global, exécutez le framework de tests :
 ```bash
-python -m unittest tests.test_app
+python -m unittest discover -s tests -q
 ```
 
-## Déploiement en Production (Render)
+## Build de l'application desktop
 
-L'application integre la specification `render.yaml` pour un deploiement PaaS rapide avec PostgreSQL (Supabase ou Render DB).
+Compilez l'exécutable Windows (PyInstaller) puis l'installateur (Inno Setup) :
 
-1. Poussez le projet sur un depot GitHub ou GitLab.
-2. Créez un compte sur [Render](https://render.com/).
-3. Connectez Render à votre depot Git.
-4. Le "Blueprint" de Render détectera `render.yaml` et déploiera automatiquement.
-
-N'oubliez pas de configurer la variable `DATABASE_URL` (format `postgresql://...`).
+```bash
+build.bat
+installer\build_installer.bat
+```
 
 ---
+
 Developpe pour Ciento-Immobilier.

@@ -62,7 +62,6 @@ Source: "..\assets\installer.ico"; DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\assets\splash.png"; DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\.env.example"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\requirements.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\requirements-desktop.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
 Name: "{app}\logs"; Permissions: users-modify

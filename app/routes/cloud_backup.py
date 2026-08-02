@@ -38,8 +38,8 @@ def _redirect_uri():
     """URI de redirection OAuth Google.
 
     Priorité à une valeur explicite (GOOGLE_OAUTH_REDIRECT_URI), sinon
-    construction automatique. ProxyFix garantit le schéma https derrière un
-    reverse proxy.
+    construction automatique à partir de l'URL locale (application desktop
+    100 % locale, HTTP sur 127.0.0.1).
     """
     override = current_app.config.get('GOOGLE_OAUTH_REDIRECT_URI')
     if override:

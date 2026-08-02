@@ -5,7 +5,6 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
 from flask_wtf.csrf import CSRFProtect
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Initialisation des extensions
 db = SQLAlchemy()
@@ -20,16 +19,6 @@ def create_app(config_class=None):
     from config import Config
     app = Flask(__name__)
     app.config.from_object(config_class or Config)
-
-    # Derrière un reverse proxy (Render, Vercel, Nginx, Apache) Flask doit
-    # reconstruire l'URL et le schéma (http vs https) à partir des en-têtes
-    # X-Forwarded-*. Sans cela, l'URI de redirection OAuth Google serait
-    # générée en http et rejetée par Google. Chaque proxy est présumé unique
-    # (x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1).
-    app.wsgi_app = ProxyFix(
-        app.wsgi_app,
-        x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1,
-    )
 
     # ── Configuration du logging Python ─────────────────────────────────────
     # Format : timestamp | niveau | module | message
@@ -131,15 +120,14 @@ def create_app(config_class=None):
         from app.utils.security import generate_nonce
         return dict(csp_nonce=generate_nonce)
 
-    # En-têtes HTTP de sécurité (CSP, HSTS, etc.)
+    # En-têtes HTTP de sécurité (CSP, etc.) — pas de HSTS : application
+    # 100 % locale en HTTP (desktop Windows), aucun domaine HTTPS.
     @app.after_request
     def set_security_headers(response):
         from app.utils.security import build_csp, SECURITY_HEADERS
         for header, value in SECURITY_HEADERS.items():
             response.headers[header] = value
         response.headers['Content-Security-Policy'] = build_csp()
-        if not app.debug:
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         return response
 

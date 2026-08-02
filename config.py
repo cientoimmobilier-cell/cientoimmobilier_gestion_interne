@@ -22,13 +22,10 @@ class Config:
     db_port = os.environ.get('DB_PORT', '5432')
     db_name = os.environ.get('DB_NAME', 'ciento_immobilier')
 
-    database_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
-    if database_url:
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-        SQLALCHEMY_DATABASE_URI = database_url
-    else:
-        SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    # Application 100 % locale (desktop Windows) : PostgreSQL local uniquement,
+    # plus aucune URL de base de données cloud (DATABASE_URL / POSTGRES_URL de
+    # Render/Vercel ont été retirées).
+    SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(basedir, 'app', 'static', 'uploads')
@@ -45,11 +42,12 @@ class Config:
     CLAMAV_PORT = int(os.environ.get('CLAMAV_PORT', '3310'))
     CLAMAV_TIMEOUT = int(os.environ.get('CLAMAV_TIMEOUT', '30'))
 
-    PREFERRED_URL_SCHEME = os.environ.get('PREFERRED_URL_SCHEME', 'https')
+    # Local (desktop) : le schéma par défaut est HTTP. Aucun reverse proxy HTTPS.
+    PREFERRED_URL_SCHEME = os.environ.get('PREFERRED_URL_SCHEME', 'http')
 
     # URI de redirection OAuth Google. Optionnelle : si absente, elle est
-    # construite automatiquement (ProxyFix + url_for _external). À définir
-    # explicitement si l'auto-détection échoue derrière un proxy.
+    # construite automatiquement à partir de l'URL locale (url_for _external).
+    # À définir explicitement si l'auto-détection échoue.
     GOOGLE_OAUTH_REDIRECT_URI = os.environ.get('GOOGLE_OAUTH_REDIRECT_URI', '')
 
     # SameSite=Lax : requis pour que le cookie de session (porteur de l'état
@@ -57,19 +55,15 @@ class Config:
     # callback. SameSite=Strict bloquerait le callback OAuth.
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
-    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'True').lower() in ('true', '1', 'yes')
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')
     PERMANENT_SESSION_LIFETIME = int(os.environ.get('PERMANENT_SESSION_LIFETIME', '1800'))
 
     REMEMBER_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_SAMESITE = os.environ.get('REMEMBER_COOKIE_SAMESITE', 'Strict')
-    REMEMBER_COOKIE_SECURE = os.environ.get('REMEMBER_COOKIE_SECURE', 'True').lower() in ('true', '1', 'yes')
+    REMEMBER_COOKIE_SECURE = os.environ.get('REMEMBER_COOKIE_SECURE', 'False').lower() in ('true', '1', 'yes')
     REMEMBER_COOKIE_DURATION = int(os.environ.get('REMEMBER_COOKIE_DURATION', '86400'))
 
     WTF_CSRF_TIME_LIMIT = int(os.environ.get('WTF_CSRF_TIME_LIMIT', '1800'))
     WTF_CSRF_SSL_STRICT = True
 
     DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
-
-    if not DEBUG:
-        SESSION_COOKIE_SECURE = True
-        REMEMBER_COOKIE_SECURE = True
