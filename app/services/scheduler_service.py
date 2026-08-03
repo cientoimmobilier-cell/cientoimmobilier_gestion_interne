@@ -6,12 +6,15 @@ Thread de fond demonique demarre une fois par processus. Verifie chaque
 puis lance l'orchestrateur en arriere-plan.
 """
 import calendar
+import logging
 import threading
 from datetime import datetime, timedelta, timezone
 
 from app import db
 from app.models import CloudBackupSchedule
 from app.services.backup_service import BackupService
+
+logger = logging.getLogger(__name__)
 
 BACKUP_TYPE_BY_FREQUENCY = {
     'hourly': 'Daily',
@@ -71,6 +74,7 @@ class BackupScheduler:
     def start(self, app):
         if self._thread and self._thread.is_alive():
             return
+        self._stop.clear()
         self._thread = threading.Thread(
             target=self._loop, args=(app,), daemon=True,
             name='cloud-backup-scheduler')
@@ -84,21 +88,27 @@ class BackupScheduler:
             with app.app_context():
                 try:
                     self._tick(app)
-                except Exception:
+                except Exception as exc:
                     db.session.rollback()
+                    logger.exception(
+                        'Erreur dans le planificateur de sauvegardes: %s', exc)
 
     def _tick(self, app):
         schedule = CloudBackupSchedule.get()
         if not schedule.enabled:
             return
         now = datetime.now(timezone.utc)
-        if not schedule.next_run_at or schedule.next_run_at > now:
+        # next_run_at est stocké dans une colonne TIMESTAMP sans fuseau.
+        # La comparaison doit donc se faire en UTC naïf, sinon un TypeError
+        # offset-naive vs offset-aware désactive silencieusement le planificateur.
+        if schedule.next_run_at and schedule.next_run_at > now.replace(tzinfo=None):
             return
 
-        schedule.last_run_at = now
+        schedule.last_run_at = now.replace(tzinfo=None)
         schedule.next_run_at = compute_next_run(
             schedule.frequency, schedule.hour, schedule.minute,
-            schedule.day_of_week, schedule.day_of_month, from_time=now)
+            schedule.day_of_week, schedule.day_of_month, from_time=now
+        ).replace(tzinfo=None)
         db.session.commit()
 
         backup_type = BACKUP_TYPE_BY_FREQUENCY.get(

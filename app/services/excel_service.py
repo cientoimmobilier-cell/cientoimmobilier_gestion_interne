@@ -11,6 +11,28 @@ from app.utils.helpers import neutralize_formula
 def _safe(value):
     return neutralize_formula(value)
 
+
+def _to_number(value):
+    """Convertit une cellule Excel en nombre, sans jamais lever d'exception.
+
+    Accepte les formats courants : ``1500``, ``1 500``, ``1 500,50 €``, ``1,5``.
+    Retourne None si la valeur n'est pas convertible (ligne ignorée au lieu
+    de faire planter tout l'import).
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    raw = str(value).strip()
+    if not raw:
+        return None
+    cleaned = raw.replace('\u00a0', ' ').replace(' ', '').replace('€', '')
+    cleaned = cleaned.replace(',', '.')
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
 def export_clients_to_excel(clients):
     wb = Workbook()
     ws = wb.active
@@ -75,8 +97,8 @@ def import_clients_from_excel(file_stream):
             'profession': str(row[8]).strip() if row_len > 8 and row[8] else '',
             'zone_ciblee': str(row[9]).strip() if row_len > 9 and row[9] else '',
             'description': str(row[10]).strip() if row_len > 10 and row[10] else '',
-            'budget_min': float(row[11]) if row_len > 11 and row[11] is not None and str(row[11]).strip() != '' else None,
-            'budget_max': float(row[12]) if row_len > 12 and row[12] is not None and str(row[12]).strip() != '' else None,
+            'budget_min': _to_number(row[11]) if row_len > 11 else None,
+            'budget_max': _to_number(row[12]) if row_len > 12 else None,
             'source_client': str(row[13]).strip() if row_len > 13 and row[13] else 'Import Excel',
             'observations': str(row[14]).strip() if row_len > 14 and row[14] else '',
         }
@@ -154,18 +176,18 @@ def import_properties_from_excel(file_stream):
             'adresse': str(row[4]).strip() if row[4] else '',
             'ville': str(row[5]).strip() if row[5] else '',
             'quartier': str(row[6]).strip() if row[6] else '',
-            'prix': float(row[7]) if row[7] is not None else 0.0,
+            'prix': _to_number(row[7]) if len(row) > 7 else None,
             'devise': str(row[8]).strip() if len(row) > 8 and row[8] else 'EUR',
-            'superficie': float(row[9]) if len(row) > 9 and row[9] is not None and str(row[9]).strip() != '' else None,
-            'nombre_chambres': int(row[10]) if len(row) > 10 and row[10] is not None and str(row[10]).strip() != '' else None,
-            'nombre_salles_bain': int(row[11]) if len(row) > 11 and row[11] is not None and str(row[11]).strip() != '' else None,
-            'nombre_garages': int(row[12]) if len(row) > 12 and row[12] is not None and str(row[12]).strip() != '' else None,
+            'superficie': _to_number(row[9]) if len(row) > 9 else None,
+            'nombre_chambres': _to_number(row[10]) if len(row) > 10 else None,
+            'nombre_salles_bain': _to_number(row[11]) if len(row) > 11 else None,
+            'nombre_garages': _to_number(row[12]) if len(row) > 12 else None,
             'statut': str(row[13]).strip() if len(row) > 13 and row[13] else 'Disponible',
             'proprietaire_id': owner_id,
             'description': str(row[15]).strip() if len(row) > 15 and row[15] else '',
         }
 
-        if prop_dict['titre'] and prop_dict['prix'] > 0:
+        if prop_dict['titre'] and prop_dict['prix'] is not None and prop_dict['prix'] > 0:
             properties_data.append(prop_dict)
 
     return properties_data

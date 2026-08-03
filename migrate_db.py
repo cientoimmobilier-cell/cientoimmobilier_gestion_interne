@@ -9,8 +9,6 @@ from app import create_app, db
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
-app = create_app()
-
 COLUMNS_TO_ADD = {
     'clients': [
         {'name': 'numero_identite', 'definition': 'VARCHAR(50)'},
@@ -43,7 +41,14 @@ def _drop_not_null(conn, dialect, table, column):
         logger.warning(f'  Dialecte non supporté pour {table}.{column} ({dialect}).')
 
 
-def migrate():
+def migrate(app=None):
+    """Synchronise le schéma existant (tables, colonnes, index) sans perte.
+
+    ``app`` peut être fourni (cas du démarrage desktop) pour éviter de créer
+    une seconde application Flask (et donc un second planificateur).
+    """
+    if app is None:
+        app = create_app()
     with app.app_context():
         inspector = inspect(db.engine)
         existing_tables = set(inspector.get_table_names())
@@ -101,19 +106,34 @@ def migrate():
                 if table_name not in final_tables:
                     continue
                 existing_indexes = {ix['name'] for ix in inspector.get_indexes(table_name)}
+                # Index explicites (db.Index(...)) et index implicites créés
+                # par index=True sur les colonnes (nommés ix_<table>_<colonne>
+                # par SQLAlchemy). L'ancienne version ignorait ces derniers :
+                # 38 index de clés étrangères manquaient en base.
+                candidates = []
+                seen = set()
                 for index in table.indexes:
-                    index_name = index.name
+                    cols = [c.name for c in index.columns]
+                    if cols and index.name not in seen:
+                        candidates.append((index.name, cols))
+                        seen.add(index.name)
+                for col in table.columns:
+                    name = f'ix_{table_name}_{col.name}'
+                    if (col.index and col.name and col.unique is not True
+                            and name not in seen):
+                        candidates.append((name, [col.name]))
+                        seen.add(name)
+                for index_name, columns in candidates:
                     if index_name in existing_indexes:
                         continue
-                    columns = ', '.join(c.name for c in index.columns)
                     if not columns:
                         continue
                     sql = (
                         f'CREATE INDEX IF NOT EXISTS {index_name} '
-                        f'ON {table_name} ({columns})'
+                        f'ON {table_name} ({", ".join(columns)})'
                     )
                     conn.execute(text(sql))
-                    logger.info(f'  Index cree: {index_name} ON {table_name} ({columns})')
+                    logger.info(f'  Index cree: {index_name} ON {table_name} ({", ".join(columns)})')
                     created += 1
             conn.commit()
         if created:

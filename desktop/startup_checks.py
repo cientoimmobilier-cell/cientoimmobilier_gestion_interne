@@ -1,5 +1,4 @@
 import os
-import sys
 import shutil
 import logging
 import subprocess
@@ -33,19 +32,19 @@ class StartupChecker:
     def _env_dir(self):
         """Répertoire contenant le .env réellement chargé par config.py.
 
-        En mode PyInstaller onefile, config.py lit le .env empaqueté dans
-        sys._MEIPASS ; les contrôles doivent donc cibler le même fichier
-        et non un .env d'exemple posé à côté de l'exe.
+        Depuis la remédiation FIX 13, config.py lit le .env depuis BASE_DIR —
+        le dossier de l'exe en mode PyInstaller onefile, la racine du projet en
+        mode source — et ne l'empaquette PLUS dans sys._MEIPASS. Les contrôles
+        de démarrage doivent donc cibler le même dossier (self.base_dir), sinon
+        ils signalent à tort « .env file not found » sur l'exécutable figé.
         """
-        if getattr(sys, 'frozen', False):
-            return getattr(sys, '_MEIPASS', self.base_dir)
         return self.base_dir
 
     def check_all(self):
         self._check_directories()
         self._check_env_file()
         self._check_postgresql()
-        self._check_migrations()
+        self._check_schema()
         return len(self.errors) == 0
 
     def _check_directories(self):
@@ -111,25 +110,40 @@ class StartupChecker:
         except Exception as e:
             self.errors.append(f'Database connection failed: {e}')
 
-    def _check_migrations(self):
+    def _check_schema(self):
+        """Vérification légère du schéma SANS créer d'app Flask.
+
+        L'ancienne version appelait create_app(), ce qui doublait le thread du
+        planificateur de sauvegardes à chaque démarrage. La synchronisation
+        réelle (tables/colonnes/index manquants) est effectuée une seule fois
+        par run_desktop() sur l'app unique avant le démarrage du serveur.
+        """
         try:
             from dotenv import load_dotenv
             load_dotenv(os.path.join(self._env_dir(), '.env'))
-            from app import create_app, db
-            app = create_app()
-            with app.app_context():
-                from sqlalchemy import inspect
-                inspector = inspect(db.engine)
-                tables = inspector.get_table_names()
-                required_tables = ['utilisateurs', 'clients', 'proprietes',
-                                   'transactions', 'occupations']
-                missing = [t for t in required_tables if t not in tables]
-                if missing:
-                    self.warnings.append(
-                        f'Missing tables: {", ".join(missing)}. '
-                        f'Run: python init_db.py'
-                    )
-                else:
-                    logger.info(f'Database schema OK — {len(tables)} tables found')
+
+            db_host = os.environ.get('DB_HOST', 'localhost')
+            db_port = os.environ.get('DB_PORT', '5432')
+            db_name = os.environ.get('DB_NAME', 'ciento_immobilier_db')
+            db_user = os.environ.get('DB_USER', 'postgres')
+            db_password = os.environ.get('DB_PASSWORD', 'postgres')
+
+            import psycopg2
+            conn = psycopg2.connect(
+                host=db_host, port=db_port, user=db_user,
+                password=db_password, dbname=db_name, connect_timeout=5)
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT count(*) FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_name IN "
+                "('utilisateurs','clients','proprietes','transactions','occupations')")
+            found = cur.fetchone()[0]
+            conn.close()
+            if found < 5:
+                self.warnings.append(
+                    'Schéma de base incomplet — synchronisation automatique '
+                    'tentée au démarrage (python migrate_db).')
+            else:
+                logger.info('Schéma de base présent (5 tables de référence).')
         except Exception as e:
-            self.warnings.append(f'Migration check failed: {e}')
+            self.warnings.append(f'Schema check failed: {e}')

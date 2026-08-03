@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Fermer la sidebar en cliquant sur l'overlay
-    if (overlay) {
+    if (overlay && sidebar) {
         overlay.addEventListener('click', function() {
             sidebar.classList.remove('active');
             overlay.classList.remove('active');

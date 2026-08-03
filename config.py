@@ -1,21 +1,30 @@
 import os
+import sys
 from urllib.parse import quote, quote_plus
 
 from dotenv import load_dotenv
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-load_dotenv(os.path.join(basedir, '.env'))
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+# En mode PyInstaller onefile, ``__file__`` pointe vers _MEIPASS (dossier
+# temporaire d'extraction, supprimé à la fermeture). Le .env et les données
+# utilisateur doivent donc être lus depuis le dossier du .exe, jamais _MEIPASS.
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', '')
 
-    if not SECRET_KEY or len(SECRET_KEY) < 32:
+    _PLACEHOLDER_KEY = 'change-me-to-a-random-secret-key-at-least-32-chars'
+    if (not SECRET_KEY or len(SECRET_KEY) < 32
+            or SECRET_KEY == _PLACEHOLDER_KEY):
         raise RuntimeError(
-            'SECRET_KEY manquante ou trop courte : définissez la variable '
-            'd\'environnement SECRET_KEY (au moins 32 caractères). '
-            'Aucune génération automatique : celle-ci invalidait les sessions '
-            'à chaque redémarrage. Génération : '
+            'SECRET_KEY manquante, trop courte ou encore celle du modèle '
+            '(.env.example). Définissez la variable d\'environnement SECRET_KEY '
+            '(au moins 32 caractères). Aucune génération automatique : celle-ci '
+            'invalidait les sessions à chaque redémarrage. Génération : '
             'python -c "import secrets; print(secrets.token_hex(32))"')
 
     db_user = os.environ.get('DB_USER', 'postgres')
@@ -33,7 +42,14 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(basedir, 'app', 'static', 'uploads')
+    # Chemin absolu, indépendant du répertoire courant. En mode frozen,
+    # BASE_DIR est le dossier du .exe : les uploads ne doivent jamais atterrir
+    # dans le dossier temp _MEIPASS (ils seraient perdus à la fermeture).
+    _upload = (os.environ.get('UPLOAD_FOLDER')
+               or os.path.join(BASE_DIR, 'app', 'static', 'uploads'))
+    if not os.path.isabs(_upload):
+        _upload = os.path.join(BASE_DIR, _upload)
+    UPLOAD_FOLDER = _upload
 
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
 

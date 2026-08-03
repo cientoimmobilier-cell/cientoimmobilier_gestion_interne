@@ -84,19 +84,22 @@ def safe_path_join(base_dir, untrusted_path):
 def log_activity(user_id, action, table_concernee=None, enregistrement_id=None):
     """
     Enregistre une action utilisateur dans le journal d'activités.
-    Utilise flush() pour rester dans la session parente sans commit autonome.
+
+    L'écriture est isolée dans un SAVEPOINT (begin_nested) : en cas d'échec,
+    seule la ligne du journal est annulée. La transaction métier de l'appelant
+    n'est JAMAIS remise à zéro (l'ancien code appelait db.session.rollback(),
+    ce qui détruisait silencieusement l'opération en cours).
     """
     try:
-        log = JournalActivite(
-            utilisateur_id=user_id,
-            action=action,
-            table_concernee=table_concernee,
-            enregistrement_id=enregistrement_id
-        )
-        db.session.add(log)
-        db.session.flush()
+        with db.session.begin_nested():
+            log = JournalActivite(
+                utilisateur_id=user_id,
+                action=action,
+                table_concernee=table_concernee,
+                enregistrement_id=enregistrement_id
+            )
+            db.session.add(log)
     except Exception as e:
-        db.session.rollback()
         logger.error(f"[JOURNAL] Échec enregistrement activité user_id={user_id}: {e}")
 
 

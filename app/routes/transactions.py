@@ -134,10 +134,21 @@ def add_transaction():
                 )
                 db.session.add(commission)
             
-            # Réserver la propriété (changer son statut en "Réservé")
+            # Réserver la propriété (changer son statut en "Réservé").
+            # Vérification côté serveur : le filtre "Disponible" du formulaire
+            # peut être périmé (double réservation) ou contourné par POST.
             prop = db.session.get(Propriete, propriete_id)
-            if prop:
-                prop.statut = 'Réservé'
+            if prop is None:
+                db.session.rollback()
+                flash("La propriété sélectionnée est introuvable.", "danger")
+                return redirect(url_for('transactions.add_transaction'))
+            if prop.statut != 'Disponible':
+                db.session.rollback()
+                flash(
+                    f"Le bien {prop.reference_bien} n'est plus disponible "
+                    f"(statut actuel : {prop.statut}).", "warning")
+                return redirect(url_for('transactions.add_transaction'))
+            prop.statut = 'Réservé'
                 
             log_activity(current_user.id, f"Création transaction: {reference_transaction}", "transactions", new_tx.id)
             db.session.commit()
@@ -302,8 +313,17 @@ def edit_transaction(tx_id):
             
             # Réserver la nouvelle
             nouvelle_prop = db.session.get(Propriete, int(nouveau_propriete_id))
-            if nouvelle_prop:
-                nouvelle_prop.statut = 'Réservé'
+            if nouvelle_prop is None:
+                db.session.rollback()
+                flash("La nouvelle propriété est introuvable.", "danger")
+                return redirect(url_for('transactions.edit_transaction', tx_id=tx.id))
+            if nouvelle_prop.statut != 'Disponible':
+                db.session.rollback()
+                flash(
+                    f"Le bien {nouvelle_prop.reference_bien} n'est plus disponible "
+                    f"(statut actuel : {nouvelle_prop.statut}).", "warning")
+                return redirect(url_for('transactions.edit_transaction', tx_id=tx.id))
+            nouvelle_prop.statut = 'Réservé'
             
             tx.propriete_id = nouveau_propriete_id
 

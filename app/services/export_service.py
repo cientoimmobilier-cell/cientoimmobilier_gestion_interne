@@ -7,7 +7,7 @@ import csv
 import io
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from openpyxl import Workbook
@@ -137,7 +137,7 @@ def export_pdf(group_key):
         Paragraph('CIENTO IMMOBILIER', title_style),
         Paragraph(
             f'{group["label"]} — {len(rows)} enregistrement(s) — '
-            f'{datetime.now().strftime("%d/%m/%Y à %H:%M")}', sub_style),
+            f'{datetime.now(timezone.utc).strftime("%d/%m/%Y à %H:%M")} UTC', sub_style),
     ]
     data = [[Paragraph(_prettify(c.name), header_style) for c in columns]]
     for obj in rows:
@@ -180,13 +180,19 @@ def _sql_literal(value, dialect_name):
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, Decimal):
-        return repr(float(value))
+        # str() conserve la précision exacte du NUMERIC ; repr(float())
+        # perdait les décimales au-delà de 15-16 chiffres significatifs.
+        return str(value)
     if isinstance(value, bytes):
         hexed = value.hex()
         if dialect_name == 'postgresql':
             return f"'\\x{hexed}'"
         return f"X'{hexed}'"
     if isinstance(value, (datetime, date)):
+        if isinstance(value, datetime) and value.tzinfo is not None:
+            # Les colonnes sont TIMESTAMP sans fuseau : on dumps en UTC naïf
+            # pour éviter un décalage à la restauration.
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
         return "'" + value.isoformat().replace("'", "''") + "'"
     if isinstance(value, (dict, list)):
         value = json.dumps(value, ensure_ascii=False)
@@ -199,7 +205,7 @@ def export_sql():
     tables = list(db.metadata.sorted_tables)
     lines = [
         '-- CIENTO IMMOBILIER — Sauvegarde de la base de données',
-        f'-- Générée le {datetime.now().strftime("%d/%m/%Y à %H:%M")}',
+        f'-- Générée le {datetime.now(timezone.utc).strftime("%d/%m/%Y à %H:%M")} UTC',
         'BEGIN;',
     ]
     for table in reversed(tables):

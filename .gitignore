@@ -37,6 +37,10 @@ venv.bak/
 .env
 # Garder .env.example (documentation de configuration)
 
+# ── Secrets OAuth Google (identifiants d'API, ne jamais versionner) ─────────
+client_secret_*.json
+client_secret*.json
+
 # ── Flask / SQLAlchemy ──────────────────────────────────────────────────────
 instance/
 *.sqlite3

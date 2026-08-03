@@ -6,6 +6,7 @@ from datetime import datetime
 
 LOG_DIR = None
 _startup_logger = None
+_configured = False
 
 
 def ensure_log_dir(base_dir=None):
@@ -20,6 +21,14 @@ def ensure_log_dir(base_dir=None):
 
 
 def setup_logging(base_dir=None, debug=False):
+    global _startup_logger, _configured
+    if _configured:
+        # Idempotent : plusieurs appels (tests, main(), sous-modules) ne
+        # doivent NI doubler les handlers (lignes de log dupliquées) NI
+        # recréer les fichiers de logs.
+        return _startup_logger or logging.getLogger('startup')
+    _configured = True
+
     log_dir = ensure_log_dir(base_dir)
     level = logging.DEBUG if debug else logging.INFO
 
@@ -77,7 +86,6 @@ def setup_logging(base_dir=None, debug=False):
         console.setFormatter(formatter)
         root.addHandler(console)
 
-    global _startup_logger
     _startup_logger = startup_logger
 
     startup_logger.info('=== CIENTO IMMOBILIER STARTUP ===')

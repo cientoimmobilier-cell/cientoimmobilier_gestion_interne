@@ -15,6 +15,7 @@ import time
 import zipfile
 from datetime import datetime, timezone
 from io import BytesIO
+import logging
 
 from sqlalchemy import select
 
@@ -24,6 +25,8 @@ from app.services import crypto_service
 from app.services.crypto_service import CryptoError
 from app.services.export_service import REPORT_GROUPS, export_csv, export_excel, export_pdf, export_sql
 from app.services.google_drive_service import GoogleDriveError, GoogleDriveService
+
+logger = logging.getLogger(__name__)
 
 FOLDER_BY_TYPE = {
     'Daily': 'Daily',
@@ -105,7 +108,12 @@ def _restore_upload_files(zf, prefix, target_dir):
     if not target_dir:
         return 0
     prefix = prefix.rstrip('/') + '/'
-    target_abs = os.path.abspath(target_dir)
+    # realpath résout les liens symboliques (anti zip-slip via symlink) ;
+    # normcase rend la comparaison insensible à la casse sur Windows.
+    target_abs = os.path.normcase(os.path.realpath(target_dir))
+    # guard en ``base + os.sep`` gère aussi le cas où target_dir est la racine
+    # d'un volume (ex. C:\).
+    target_guard = target_abs.rstrip(os.sep) + os.sep
     count = 0
     for info in zf.infolist():
         if not info.filename.startswith(prefix) or info.is_dir():
@@ -114,7 +122,8 @@ def _restore_upload_files(zf, prefix, target_dir):
         if not rel or rel.startswith('..') or os.path.isabs(rel):
             continue
         dest = os.path.join(target_dir, rel)
-        if not os.path.abspath(dest).startswith(target_abs + os.sep):
+        dest_real = os.path.normcase(os.path.realpath(dest))
+        if not (dest_real == target_abs or dest_real.startswith(target_guard)):
             continue
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         with zf.open(info) as src, open(dest, 'wb') as out:
@@ -156,10 +165,18 @@ class BackupService:
     # ── Exécution ──────────────────────────────────────────────────────────
     def _run_backup(self, job_id, backup_type, user_name, include_data):
         started = time.time()
-        record = CloudBackupRecord(backup_type=backup_type, status='running',
-                                   triggered_by=user_name)
-        db.session.add(record)
-        db.session.commit()
+        try:
+            record = CloudBackupRecord(backup_type=backup_type, status='running',
+                                       triggered_by=user_name)
+            db.session.add(record)
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            self.progress.update(job_id, progress=100, status='failed',
+                                 message=f'Impossible de démarrer la sauvegarde : {exc}',
+                                 finished_at=datetime.now(timezone.utc))
+            logger.error('Impossible de créer l\'enregistrement de sauvegarde: %s', exc)
+            return
         record_id = record.id
 
         tmpdir = tempfile.mkdtemp(prefix='ciento_backup_')
@@ -305,8 +322,15 @@ class BackupService:
         for record in records[int(retention):]:
             try:
                 drive.files().delete(fileId=record.drive_file_id).execute()
-            except Exception:
-                pass
+            except Exception as exc:
+                # Suppression Drive échouée : on conserve drive_file_id pour
+                # permettre une suppression manuelle plus tard. Sinon le fichier
+                # deviendrait orphelin sur Drive, invisible depuis l'interface.
+                record.message = (record.message or '') + \
+                    f' [Rétention : suppression Drive échouée ({exc})]'
+                logger.error('Échec suppression Drive rétention file_id=%s: %s',
+                             record.drive_file_id, exc)
+                continue
             record.drive_file_id = None
             record.message = (record.message or '') + ' [Fichier supprimé par rétention]'
         db.session.commit()
@@ -341,10 +365,6 @@ class BackupService:
             except CryptoError as exc:
                 raise GoogleDriveError(str(exc))
             with zipfile.ZipFile(BytesIO(data)) as zf:
-                upload_root = (self.app.config.get('UPLOAD_FOLDER') or '')
-                # Restauration ciblée des uploads (anti zip-slip dans
-                # _restore_upload_files) — aucun extractall global.
-                _restore_upload_files(zf, 'uploads', upload_root)
                 # Extraction sécurisée du script SQL (lecture directe, jamais
                 # d'extraction à partir d'un nom issu de l'archive).
                 sql_name = next((n for n in zf.namelist()
@@ -352,13 +372,21 @@ class BackupService:
                 if not sql_name:
                     raise GoogleDriveError('Archive invalide : base_de_donnees.sql absent.')
                 script = zf.read(sql_name).decode('utf-8')
-            _validate_restore_sql(script)
-            from sqlalchemy import text
-            db.session.remove()
-            with db.engine.connect() as conn:
-                conn = conn.execution_options(isolation_level='AUTOCOMMIT')
-                execute_sql_script(conn, script)
-            db.session.remove()
+                _validate_restore_sql(script)
+
+                # Restauration de la BASE D'ABORD : si la validation ou
+                # l'exécution SQL échoue, les uploads existants ne sont pas
+                # touchés (restauration non destructive des fichiers).
+                from sqlalchemy import text
+                db.session.remove()
+                with db.engine.connect() as conn:
+                    conn = conn.execution_options(isolation_level='AUTOCOMMIT')
+                    execute_sql_script(conn, script)
+                db.session.remove()
+
+                # ...puis les fichiers uploads (uniquement si la base est OK).
+                upload_root = (self.app.config.get('UPLOAD_FOLDER') or '')
+                _restore_upload_files(zf, 'uploads', upload_root)
             return record.file_name or record.drive_file_id
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
@@ -394,7 +422,11 @@ def _validate_restore_sql(script):
         r'pg_read_file|pg_write_file|pg_ls_dir|pg_stat_file|lo_import|lo_export|pg_sleep',
         r'\bdo\s*\$', r'copy\s+.*\bto\b',
     )
-    lower = script.lower()
+    # Neutralise les commentaires-bloc (ex. DELETE/**/FROM) qui permettaient
+    # de contourner les motifs ci-dessus, puis aplatit les suites d'espaces.
+    normalized = re.sub(r'/\*.*?\*/', ' ', script, flags=re.DOTALL)
+    normalized = re.sub(r'\s+', ' ', normalized)
+    lower = normalized.lower()
     for pattern in forbidden:
         if re.search(pattern, lower):
             raise GoogleDriveError(

@@ -121,8 +121,13 @@ h1 {{ font-size:28px; font-weight:300; letter-spacing:2px; margin-bottom:8px; }}
 </body></html>'''
 
 
-def _run_flask(port):
-    startup_logger.info('Starting Flask server on port %s...', port)
+def _build_desktop_app():
+    """Application Flask unique pour le bureau (local, HTTP loopback).
+
+    Créée UNE SEULE fois par lancement : l'ancien code appelait create_app()
+    dans startup_checks puis dans _run_flask, ce qui doublait le thread du
+    planificateur de sauvegardes (double sauvegarde Google Drive possible).
+    """
     from config import Config
     from app import create_app
 
@@ -137,7 +142,13 @@ def _run_flask(port):
         REMEMBER_COOKIE_SECURE = False
         PREFERRED_URL_SCHEME = 'http'
 
-    app = create_app(DesktopConfig)
+    return create_app(DesktopConfig)
+
+
+def _run_flask(port, app=None):
+    startup_logger.info('Starting Flask server on port %s...', port)
+    if app is None:
+        app = _build_desktop_app()
 
     @app.route('/splash')
     def splash_page():
@@ -192,6 +203,30 @@ def run_desktop(port=None, no_splash=False):
         for warn in checker.warnings:
             startup_logger.warning('CHECK: %s', warn)
 
+        # Blocage au démarrage en cas d'erreur critique : ouvrir l'interface
+        # contre une base morte (PostgreSQL arrêté, .env absent, etc.) ne ferait
+        # qu'afficher une application 500 sur chaque action.
+        if checker.errors:
+            logger.error('Startup checks failed: %s', checker.errors)
+            _show_error_dialog(
+                'Démarrage impossible',
+                'Vérifications de démarrage non satisfaites :\n\n'
+                + '\n'.join(f'• {e}' for e in checker.errors)
+                + '\n\nConsultez les logs dans le dossier logs/.')
+            return
+
+        # Application Flask unique + synchronisation du schéma (tables,
+        # colonnes et index manquants) AVANT de servir, pour éviter les
+        # erreurs "column does not exist" au premier clic.
+        startup_logger.info('Phase 1b/4 — Building Flask app (single instance)')
+        app = _build_desktop_app()
+        try:
+            from migrate_db import migrate as sync_schema
+            with app.app_context():
+                sync_schema(app)
+        except Exception as exc:
+            logger.error('Schema sync failed: %s', exc, exc_info=True)
+
         startup_logger.info('Phase 2/4 — Port detection')
         port_mgr = PortManager()
         port = port_mgr.find_free_port(port)
@@ -205,7 +240,7 @@ def run_desktop(port=None, no_splash=False):
 
         startup_logger.info('Phase 3/4 — Starting Flask on port %s', port)
         flask_thread = threading.Thread(
-            target=_run_flask, args=(port,), daemon=True
+            target=_run_flask, args=(port, app), daemon=True
         )
         flask_thread.start()
 

@@ -1,5 +1,4 @@
 import socket
-import random
 import logging
 from contextlib import closing
 
@@ -9,6 +8,8 @@ logger = logging.getLogger(__name__)
 class PortManager:
     DEFAULT_PORT = 5005
     MAX_PORT = 5100
+    FALLBACK_MIN = 10500
+    FALLBACK_MAX = 10600
 
     def __init__(self):
         self._port = None
@@ -53,12 +54,18 @@ class PortManager:
                 self._port = test_port
                 return test_port
 
-        fallback = random.randint(10500, 65535)
-        while not self.is_port_available(fallback):
-            fallback = random.randint(10500, 65535)
-        logger.warning(f'Using fallback port: {fallback}')
-        self._port = fallback
-        return fallback
+        # Repli BORNÉ : la version précédente faisait `while not libre: random`,
+        # une boucle infinie potentielle (surtout si tous les ports sont pris).
+        # On balaye une plage déterministe puis on échoue proprement.
+        for test_port in range(self.FALLBACK_MIN, self.FALLBACK_MAX + 1):
+            if self.is_port_available(test_port):
+                logger.warning(f'Using fallback port: {test_port}')
+                self._port = test_port
+                return test_port
+
+        raise RuntimeError(
+            'Aucun port libre disponible entre 5005 et 10600. '
+            'Fermez d\'autres applications et réessayez.')
 
     @property
     def port(self):

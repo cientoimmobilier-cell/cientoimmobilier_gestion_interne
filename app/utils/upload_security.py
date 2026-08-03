@@ -134,6 +134,12 @@ def secure_save_path(upload_dir, original_filename, prefix=''):
 # Mode de connexion détecté : 'unix', 'network' ou None (indisponible).
 _clamav_mode = None
 
+def _clamav_config():
+    host = current_app.config.get('CLAMAV_HOST', '127.0.0.1')
+    port = int(current_app.config.get('CLAMAV_PORT', 3310))
+    timeout = int(current_app.config.get('CLAMAV_TIMEOUT', 30))
+    return host, port, timeout
+
 def is_clamav_available():
     global _clamav_mode
     if _clamav_mode is not None:
@@ -145,6 +151,8 @@ def is_clamav_available():
         logger.warning("[UPLOAD] pyclamd non installé — upload sans scan antivirus")
         return False
 
+    host, port, timeout = _clamav_config()
+
     # Sur Windows, le socket Unix n'existe pas : le démon ClamAV écoute
     # généralement en TCP sur 127.0.0.1:3310.
     if os.name == 'nt':
@@ -154,10 +162,14 @@ def is_clamav_available():
 
     for factory in factories:
         try:
-            cd = factory()
+            if factory is pyclamd.ClamdNetworkSocket:
+                cd = factory(host=host, port=port, timeout=timeout)
+            else:
+                cd = factory()
             cd.ping()
             _clamav_mode = 'network' if factory is pyclamd.ClamdNetworkSocket else 'unix'
-            logger.info("[UPLOAD] ClamAV détecté (socket %s)", _clamav_mode)
+            logger.info("[UPLOAD] ClamAV détecté (socket %s:%s, %s)",
+                        host, port, _clamav_mode)
             return True
         except Exception:
             continue
@@ -167,8 +179,9 @@ def is_clamav_available():
 
 def _clamd_connection():
     import pyclamd
+    host, port, timeout = _clamav_config()
     if _clamav_mode == 'network':
-        return pyclamd.ClamdNetworkSocket()
+        return pyclamd.ClamdNetworkSocket(host=host, port=port, timeout=timeout)
     return pyclamd.ClamdUnixSocket()
 
 def scan_with_clamav(filepath):
@@ -188,6 +201,10 @@ def scan_with_clamav(filepath):
         return True, None
 
 def log_upload(user_id, filename, file_size, category, status, details=''):
+    # Nettoyage du nom de fichier (contrôlé par l'utilisateur) pour éviter
+    # l'injection de lignes de log.
+    filename = str(filename).replace('\r', ' ').replace('\n', ' ')
+    details = str(details).replace('\r', ' ').replace('\n', ' ')
     logger.info(
         f"[UPLOAD] user={user_id} | fichier={filename} | taille={file_size} | "
         f"catégorie={category} | statut={status} | {details}"
@@ -246,7 +263,7 @@ def validate_and_save_upload(
             )
         ext_uploaded = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
         ext_detected_set = set(detected.extensions)
-        if ext_uploaded not in ext_detected_set and ext_uploaded not in detected.extensions:
+        if ext_uploaded not in ext_detected_set:
             log_upload(user_id, original_name, 0, category, 'BLOQUÉ',
                        f'Extension {ext_uploaded} != contenu {detected.extensions[0]}')
             raise UploadValidationError(
