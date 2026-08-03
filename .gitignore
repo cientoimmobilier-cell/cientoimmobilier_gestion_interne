@@ -86,6 +86,10 @@ test_*_insertion.py
 backups/
 *.zip.ciento
 
+# ── Répertoires de travail générés localement (exports, temp) ───────────────
+exports/
+temp/
+
 # ── Uploads utilisateur (données métier, ne pas versionner) ─────────────────
 app/static/uploads/*
 !app/static/uploads/.gitkeep
