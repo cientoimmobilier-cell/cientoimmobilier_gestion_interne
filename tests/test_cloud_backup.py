@@ -1,9 +1,12 @@
 """Tests du module Sauvegarde Cloud Google Drive (AES-256, exports, backup/restore)."""
 import base64
+import io
+import json
 import os
 import shutil
 import tempfile
 import unittest
+import zipfile as zipfile_mod
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -14,7 +17,7 @@ from app.models import (
     Client, CloudBackupRecord, CloudBackupSchedule, CloudBackupSetting,
     Utilisateur,
 )
-from app.services import backup_service, crypto_service, export_service
+from app.services import backup_manifest, backup_service, crypto_service, export_service
 from app.services.scheduler_service import compute_next_run
 from app.routes.cloud_backup import _redirect_uri
 
@@ -157,6 +160,40 @@ class CloudBackupTestCase(unittest.TestCase):
         setting.encryption_passphrase_wrapped = crypto_service.wrap_secret(PASSPHRASE)
         db.session.commit()
         return setting
+
+    # ── helpers manifest / archives fabriquées ───────────────────────────────
+    def _push_encrypted_zip(self, drive, zip_bytes):
+        """Encrypte un ZIP et le dépose dans le Drive simulé ; retourne le file_id."""
+        encrypted = crypto_service.encrypt_bytes(zip_bytes, PASSPHRASE)
+        drive._next_id += 1
+        file_id = f'fake_file_{drive._next_id}'
+        drive.store[file_id] = encrypted
+        return file_id
+
+    def _make_record(self, file_id):
+        record = CloudBackupRecord(
+            backup_type='Manual', status='success', drive_folder='Archive',
+            drive_file_id=file_id, file_name='test_archive.zip',
+            finished_at=datetime.now(timezone.utc))
+        db.session.add(record)
+        db.session.commit()
+        return record
+
+    def _zip_with(self, sql_bytes, manifest=None):
+        buf = io.BytesIO()
+        with zipfile_mod.ZipFile(buf, 'w') as zf:
+            zf.writestr('sauvegarde/base_de_donnees.sql', sql_bytes)
+            if manifest is not None:
+                zf.writestr('sauvegarde/manifest.json',
+                            json.dumps(manifest, ensure_ascii=False))
+        return buf.getvalue()
+
+    def _build_valid_manifest(self, sql_bytes, overrides=None):
+        manifest = backup_manifest.build_manifest('Manual', ['clients'],
+                                                  sql_bytes, 0)
+        if overrides:
+            manifest.update(overrides)
+        return manifest
 
     # ── Chiffrement ──────────────────────────────────────────────────────────
     def test_crypto_roundtrip(self):
@@ -635,6 +672,165 @@ class CloudBackupTestCase(unittest.TestCase):
             self.assertTrue(FakeOAuth.revoked)
         finally:
             cb.GoogleDriveService = original
+
+    # ── Versionnage : manifest + redaction des secrets ───────────────────────
+    def test_backup_archive_contains_manifest_and_redacts_secrets(self):
+        from app.services.google_drive_service import GoogleDriveError
+        self._seed_data()
+        self._enable_setting()
+        setting = CloudBackupSetting.get()
+        setting.google_client_id_wrapped = crypto_service.wrap_secret('client-id-xyz')
+        setting.google_client_secret_wrapped = crypto_service.wrap_secret('GOCSPX-secret-abc')
+        setting.token_encrypted = crypto_service.wrap_secret('{"token":"t"}')
+        db.session.commit()
+
+        original_class = backup_service.GoogleDriveService
+        backup_service.GoogleDriveService = FakeGoogleDriveService
+        FakeGoogleDriveService.reset_drive()
+        try:
+            service = backup_service.BackupService(self.app)
+            service.progress.create('job-manifest')
+            service._run_backup('job-manifest', 'Manual', 'Testeur', 'all')
+            record = db.session.execute(select(CloudBackupRecord)).scalars().first()
+
+            encrypted = FakeGoogleDriveService._shared_drive.store[record.drive_file_id]
+            zip_bytes = crypto_service.decrypt_bytes(encrypted, PASSPHRASE)
+            with zipfile_mod.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                members = zf.namelist()
+                manifest_name = next(n for n in members if n.endswith('manifest.json'))
+                sql_name = next(n for n in members if n.endswith('base_de_donnees.sql'))
+
+                manifest = backup_manifest.load_manifest(zf.read(manifest_name))
+                self.assertEqual(manifest['format_version'],
+                                 backup_manifest.BACKUP_FORMAT_VERSION)
+                self.assertEqual(manifest['database']['schema_fingerprint'],
+                                 backup_manifest.compute_schema_fingerprint())
+                self.assertIn('clients', manifest['database']['tables'])
+                expected = 'sha256:' + backup_manifest.compute_sha256(zf.read(sql_name))
+                self.assertEqual(manifest['files']['checksums']['base_de_donnees.sql'],
+                                 expected)
+
+                sql_text = zf.read(sql_name).decode('utf-8')
+                # Aucune clé ne doit transiter dans le dump :
+                self.assertNotIn('GOCSPX-secret-abc', sql_text)
+                self.assertNotIn('client-id-xyz', sql_text)
+                self.assertNotIn('"token":"t"', sql_text)
+                self.assertNotIn(PASSPHRASE, sql_text)
+        finally:
+            backup_service.GoogleDriveService = original_class
+
+    def test_sql_dump_redaction_off_preserves_secrets(self):
+        self._enable_setting()
+        setting = CloudBackupSetting.get()
+        wrapped = crypto_service.wrap_secret('GOCSPX-secret-abc')
+        setting.google_client_secret_wrapped = wrapped
+        db.session.commit()
+        redacted = export_service.export_sql(redact=True)
+        raw = export_service.export_sql(redact=False)
+        self.assertNotIn(wrapped, redacted)
+        self.assertIn(wrapped, raw)
+
+    def test_restore_refuses_archive_without_manifest(self):
+        from app.services.google_drive_service import GoogleDriveError
+        self._enable_setting()
+        original_class = backup_service.GoogleDriveService
+        backup_service.GoogleDriveService = FakeGoogleDriveService
+        FakeGoogleDriveService.reset_drive()
+        try:
+            drive = FakeGoogleDriveService._shared_drive
+            file_id = self._push_encrypted_zip(
+                drive, self._zip_with(b'BEGIN;\nCOMMIT;\n', manifest=None))
+            record = self._make_record(file_id)
+            with self.assertRaises(GoogleDriveError) as ctx:
+                backup_service.BackupService(self.app).restore_backup(
+                    record.id, PASSPHRASE)
+            self.assertIn('non versionné', str(ctx.exception))
+        finally:
+            backup_service.GoogleDriveService = original_class
+
+    def test_restore_refuses_incompatible_schema(self):
+        from app.services.google_drive_service import GoogleDriveError
+        self._enable_setting()
+        original_class = backup_service.GoogleDriveService
+        backup_service.GoogleDriveService = FakeGoogleDriveService
+        FakeGoogleDriveService.reset_drive()
+        try:
+            drive = FakeGoogleDriveService._shared_drive
+            sql_bytes = b'BEGIN;\nCOMMIT;\n'
+            manifest = self._build_valid_manifest(
+                sql_bytes, overrides={'database': {
+                    'dialect': 'postgresql',
+                    'schema_fingerprint': 'f' * 64,
+                    'tables': ['autres_tables'],
+                }})
+            file_id = self._push_encrypted_zip(drive, self._zip_with(sql_bytes, manifest))
+            record = self._make_record(file_id)
+            with self.assertRaises(GoogleDriveError) as ctx:
+                backup_service.BackupService(self.app).restore_backup(
+                    record.id, PASSPHRASE)
+            self.assertIn('Schéma de base de données incompatible', str(ctx.exception))
+        finally:
+            backup_service.GoogleDriveService = original_class
+
+    def test_restore_refuses_tampered_checksum(self):
+        from app.services.google_drive_service import GoogleDriveError
+        self._enable_setting()
+        original_class = backup_service.GoogleDriveService
+        backup_service.GoogleDriveService = FakeGoogleDriveService
+        FakeGoogleDriveService.reset_drive()
+        try:
+            drive = FakeGoogleDriveService._shared_drive
+            sql_bytes = b'BEGIN;\nCOMMIT;\n'
+            manifest = self._build_valid_manifest(sql_bytes)
+            # On modifie le SQL SANS mettre à jour le checksum du manifest.
+            tampered = self._zip_with(b'BEGIN;\nDROP TABLE clients;\nCOMMIT;\n', manifest)
+            file_id = self._push_encrypted_zip(drive, tampered)
+            record = self._make_record(file_id)
+            with self.assertRaises(GoogleDriveError) as ctx:
+                backup_service.BackupService(self.app).restore_backup(
+                    record.id, PASSPHRASE)
+            self.assertIn('Checksum du dump SQL invalide', str(ctx.exception))
+        finally:
+            backup_service.GoogleDriveService = original_class
+
+    def test_restore_preserves_google_config_and_sets_passphrase(self):
+        self._seed_data()
+        self._enable_setting()
+        setting = CloudBackupSetting.get()
+        setting.google_client_id_wrapped = crypto_service.wrap_secret('client-id-preserve')
+        setting.google_client_secret_wrapped = crypto_service.wrap_secret('GOCSPX-preserve-123')
+        setting.token_encrypted = crypto_service.wrap_secret('{"token":"preserve"}')
+        setting.google_account_email = 'cloud@test.local'
+        db.session.commit()
+
+        original_class = backup_service.GoogleDriveService
+        backup_service.GoogleDriveService = FakeGoogleDriveService
+        FakeGoogleDriveService.reset_drive()
+        try:
+            service = backup_service.BackupService(self.app)
+            service.progress.create('job-preserve')
+            service._run_backup('job-preserve', 'Manual', 'Testeur', 'all')
+            record = db.session.execute(select(CloudBackupRecord)).scalars().first()
+
+            db.session.execute(Client.__table__.delete())
+            db.session.commit()
+
+            service.restore_backup(record.id, PASSPHRASE)
+
+            restored = CloudBackupSetting.get()
+            self.assertEqual(crypto_service.unwrap_secret(
+                restored.google_client_id_wrapped), 'client-id-preserve')
+            self.assertEqual(crypto_service.unwrap_secret(
+                restored.google_client_secret_wrapped), 'GOCSPX-preserve-123')
+            self.assertEqual(crypto_service.unwrap_secret(
+                restored.token_encrypted), '{"token":"preserve"}')
+            self.assertEqual(
+                crypto_service.unwrap_secret(restored.encryption_passphrase_wrapped),
+                PASSPHRASE)
+            self.assertEqual(len(db.session.execute(
+                select(Client)).scalars().all()), 2)
+        finally:
+            backup_service.GoogleDriveService = original_class
 
 
 class TestRestoreSqlValidation(unittest.TestCase):

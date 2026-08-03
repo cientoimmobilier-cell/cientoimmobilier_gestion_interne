@@ -199,8 +199,26 @@ def _sql_literal(value, dialect_name):
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def export_sql():
-    """Dump complet : BEGIN, DROP (ordre inverse), CREATE, INSERT, sequences."""
+# Colonnes de secrets à NE JAMAIS inclure dans le dump de sauvegarde.
+# L'archive chiffrée ne doit contenir aucune clé (phrase de passe, jetons OAuth,
+# identifiants Google) : ces colonnes sont émises à NULL à l'export, ce qui
+# supprime toute dépendance circulaire « clé dans la sauvegarde ».
+SECRET_COLUMNS = {
+    'cloud_backup_settings': {
+        'google_client_id_wrapped',
+        'google_client_secret_wrapped',
+        'token_encrypted',
+        'encryption_passphrase_wrapped',
+    },
+}
+
+
+def export_sql(redact=True):
+    """Dump complet : BEGIN, DROP (ordre inverse), CREATE, INSERT, sequences.
+
+    ``redact=True`` neutralise les colonnes secrètes (SECRET_COLUMNS) : le dump
+    ne transporte aucune clé, seul le schéma et les données métier sont sauvegardés.
+    """
     dialect_name = db.engine.dialect.name
     tables = list(db.metadata.sorted_tables)
     lines = [
@@ -213,13 +231,17 @@ def export_sql():
             lines.append(f'DROP TABLE IF EXISTS {_ident(table.name)};')
         else:
             lines.append(f'DROP TABLE IF EXISTS {_ident(table.name)} CASCADE;')
+    secret_cols = SECRET_COLUMNS if redact else {}
     for table in tables:
         from sqlalchemy.schema import CreateTable
         lines.append(str(CreateTable(table).compile(dialect=db.engine.dialect)) + ';')
+        redacted = secret_cols.get(table.name, ())
         rows = db.session.execute(select(table)).mappings().all()
         for row in rows:
             columns = [c.name for c in table.columns]
-            values = ', '.join(_sql_literal(row[c], dialect_name) for c in columns)
+            values = ', '.join(
+                'NULL' if c in redacted else _sql_literal(row[c], dialect_name)
+                for c in columns)
             lines.append(
                 f'INSERT INTO {_ident(table.name)} '
                 f'({", ".join(_ident(c) for c in columns)}) VALUES ({values});'

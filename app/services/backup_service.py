@@ -22,6 +22,10 @@ from sqlalchemy import select
 from app import db
 from app.models import CloudBackupRecord, CloudBackupSchedule, CloudBackupSetting
 from app.services import crypto_service
+from app.services.backup_manifest import (
+    MANIFEST_MEMBER, SQL_MEMBER, ManifestValidationError, compute_sha256,
+    load_manifest, manifest_bytes, validate_manifest,
+)
 from app.services.crypto_service import CryptoError
 from app.services.export_service import REPORT_GROUPS, export_csv, export_excel, export_pdf, export_sql
 from app.services.google_drive_service import GoogleDriveError, GoogleDriveService
@@ -132,6 +136,54 @@ def _restore_upload_files(zf, prefix, target_dir):
     return count
 
 
+def _capture_current_cloud_secrets():
+    """Capture les identifiants Google actuels s'ils restent déchiffrables.
+
+    Retourne un dict {colonne: valeur_wrapped} + adresse email. Les valeurs dont
+    le déchiffrement échoue (SECRET_KEY différent, ex. restauration sur une autre
+    machine) sont ignorées : l'utilisateur reconnectera son compte Google.
+    """
+    setting = CloudBackupSetting.get()
+    preserved = {'google_account_email': setting.google_account_email}
+    for attr in ('google_client_id_wrapped', 'google_client_secret_wrapped',
+                 'token_encrypted'):
+        value = getattr(setting, attr)
+        if not value:
+            continue
+        try:
+            crypto_service.unwrap_secret(value)
+        except CryptoError:
+            continue
+        preserved[attr] = value
+    return preserved
+
+
+def _reinject_cloud_secrets(preserved, passphrase):
+    """Restaure la configuration cloud après remplacement de la base.
+
+    - Reporte les identifiants Google déchiffrables (préservés avant le DROP) ;
+    - définit la phrase de passe de chiffrement à celle de l'archive restaurée,
+      enveloppée localement avec le SECRET_KEY de cette machine : les futures
+      sauvegardes restent alignées sur la lignée de l'archive restaurée et une
+      sauvegarde reste restaurable après redémarrage comme sur une autre machine
+      autorisée (aucune clé n'est embarquée dans l'archive).
+    """
+    setting = CloudBackupSetting.get()
+    for attr in ('google_client_id_wrapped', 'google_client_secret_wrapped',
+                 'token_encrypted'):
+        if attr in preserved:
+            setattr(setting, attr, preserved[attr])
+    # Ne pas écraser l'email restauré depuis l'archive par un email local
+    # inexistant (ex. restauration sur une base vierge) : l'email archivé
+    # reste la valeur de référence tant qu'aucun compte n'est préservé.
+    if preserved.get('google_account_email'):
+        setting.google_account_email = preserved['google_account_email']
+    if passphrase:
+        setting.encryption_passphrase_wrapped = crypto_service.wrap_secret(passphrase)
+        setting.passphrase_set_at = datetime.now(timezone.utc)
+    db.session.commit()
+
+
 class BackupService:
     def __init__(self, app):
         self.app = app
@@ -213,13 +265,26 @@ class BackupService:
                     file_count += 1
 
             self.progress.update(job_id, progress=40, message='Dump SQL de la base...')
-            with open(os.path.join(export_dir, 'base_de_donnees.sql'), 'w',
-                      encoding='utf-8') as fh:
-                fh.write(export_sql())
+            sql_text = export_sql(redact=True)
+            sql_bytes = sql_text.encode('utf-8')
+            # Écriture en BINAIRE : en mode texte, Windows traduit \n en \r\n et
+            # le checksum du manifest ne correspondrait plus aux octets archivés.
+            with open(os.path.join(export_dir, 'base_de_donnees.sql'), 'wb') as fh:
+                fh.write(sql_bytes)
             file_count += 1
 
             upload_root = (self.app.config.get('UPLOAD_FOLDER') or '')
             upload_files = _collect_upload_files(upload_root)
+
+            # Manifest de versionnage : format, schéma, checksum, chiffrement.
+            # Écrit DANS l'archive (donc chiffré avec elle) — l'authenticité est
+            # garantie par le tag AES-GCM, le checksum protège le dump SQL.
+            self.progress.update(job_id, progress=41,
+                                 message='Génération du manifest de sauvegarde...')
+            with open(os.path.join(export_dir, 'manifest.json'), 'wb') as fh:
+                fh.write(manifest_bytes(backup_type, included, sql_bytes,
+                                        len(upload_files)))
+            file_count += 1
 
             info_lines = [
                 'CIENTO IMMOBILIER — Sauvegarde automatique',
@@ -229,6 +294,7 @@ class BackupService:
                 f'Données incluses : {", ".join(sorted(included))}',
                 f'Fichiers téléversés inclus : {len(upload_files)}',
                 f'Chiffrement : AES-256-GCM',
+                f'Format de sauvegarde : versionné (manifest.json, checksum {compute_sha256(sql_bytes)[:16]}…)',
             ]
             with open(os.path.join(export_dir, 'INFORMATIONS.txt'), 'w',
                       encoding='utf-8') as fh:
@@ -352,6 +418,7 @@ class BackupService:
             raise GoogleDriveError('Sauvegarde introuvable.')
         if not record.drive_file_id:
             raise GoogleDriveError('Le fichier Drive de cette sauvegarde a été supprimé (rétention).')
+        file_label = record.file_name or record.drive_file_id
         tmpdir = tempfile.mkdtemp(prefix='ciento_restore_')
         try:
             service = GoogleDriveService()
@@ -365,18 +432,40 @@ class BackupService:
             except CryptoError as exc:
                 raise GoogleDriveError(str(exc))
             with zipfile.ZipFile(BytesIO(data)) as zf:
-                # Extraction sécurisée du script SQL (lecture directe, jamais
-                # d'extraction à partir d'un nom issu de l'archive).
-                sql_name = next((n for n in zf.namelist()
-                                 if n.endswith('base_de_donnees.sql')), None)
-                if not sql_name:
-                    raise GoogleDriveError('Archive invalide : base_de_donnees.sql absent.')
-                script = zf.read(sql_name).decode('utf-8')
+                # ── 1. Contrôles de compatibilité (manifest + checksum) ─────
+                sql_member = next((n for n in zf.namelist()
+                                   if n.endswith(SQL_MEMBER)), None)
+                if sql_member is None:
+                    raise GoogleDriveError(
+                        'Archive invalide : base_de_donnees.sql absent.')
+                sql_bytes = zf.read(sql_member)
+
+                manifest_name = next((n for n in zf.namelist()
+                                      if n.endswith(MANIFEST_MEMBER)), None)
+                if manifest_name is None:
+                    raise GoogleDriveError(
+                        'Archive créée avec un format non versionné '
+                        '(manifest.json absent). Elle ne peut pas être restaurée : '
+                        'créez une nouvelle sauvegarde avec la version actuelle '
+                        'du logiciel.')
+                try:
+                    validate_manifest(load_manifest(zf.read(manifest_name)),
+                                      sql_bytes)
+                except ManifestValidationError as exc:
+                    raise GoogleDriveError(str(exc))
+
+                script = sql_bytes.decode('utf-8')
                 _validate_restore_sql(script)
 
-                # Restauration de la BASE D'ABORD : si la validation ou
-                # l'exécution SQL échoue, les uploads existants ne sont pas
-                # touchés (restauration non destructive des fichiers).
+                # ── 2. Préservation de la config Google avant le DROP ────────
+                # La phrase de passe N'EST PAS reprise d'ici : elle est
+                # re-définie avec celle de l'archive restaurée (aucune clé ne
+                # transite dans le dump SQL de sauvegarde).
+                preserved = _capture_current_cloud_secrets()
+
+                # ── 3. Restauration de la BASE ───────────────────────────────
+                # Les uploads ne sont touchés qu'après le succès SQL
+                # (restauration non destructive des fichiers).
                 from sqlalchemy import text
                 db.session.remove()
                 with db.engine.connect() as conn:
@@ -384,10 +473,13 @@ class BackupService:
                     execute_sql_script(conn, script)
                 db.session.remove()
 
+                # ── 4. Ré-injection config + phrase de passe ─────────────────
+                _reinject_cloud_secrets(preserved, passphrase)
+
                 # ...puis les fichiers uploads (uniquement si la base est OK).
                 upload_root = (self.app.config.get('UPLOAD_FOLDER') or '')
                 _restore_upload_files(zf, 'uploads', upload_root)
-            return record.file_name or record.drive_file_id
+            return file_label
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
